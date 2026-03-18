@@ -3,24 +3,14 @@
 
 Output demo.gif
 
-Set FontSize 16
-Set Width 900
-Set Height 500
+Set FontSize 15
+Set Width 820
+Set Height 580
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 40ms
+Set Padding 20
+Set Shell bash
+Set TypingSpeed 0
 
-Type "bundle add rails-ai-context"
+Type "bash demo_script.sh"
 Enter
-Sleep 2s
-
-Type "rails ai:doctor"
-Enter
-Sleep 3s
-
-Type "rails ai:context"
-Enter
-Sleep 3s
-
-Type "# Your AI assistants now understand your entire Rails app."
-Enter
-Sleep 2s
+Sleep 12s
