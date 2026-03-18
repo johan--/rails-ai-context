@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Named rake tasks (`ai:context:claude`, `ai:context:cursor`, etc.) that work without quoting in zsh
+- AI assistant summary table printed after `ai:context` and `ai:inspect`
+- `ENV["FORMAT"]` fallback for `ai:context_for` task
+- Format validation in `ContextFileSerializer` — unknown formats now raise `ArgumentError` with valid options
+
+### Fixed
+
+- `rails ai:context_for[claude]` failing in zsh due to bracket glob interpretation
+- Double introspection in `ai:context` and `ai:context_for` tasks (removed unused `RailsAiContext.introspect` calls)
+
 ## [0.1.0] - 2026-03-18
 
 ### Added

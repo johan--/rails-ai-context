@@ -150,15 +150,33 @@ end
 
 ---
 
+## Supported AI Assistants
+
+| AI Assistant | Context File | Command |
+|--------------|-------------|---------|
+| Claude Code | `CLAUDE.md` | `rails ai:context:claude` |
+| Cursor | `.cursorrules` | `rails ai:context:cursor` |
+| Windsurf | `.windsurfrules` | `rails ai:context:windsurf` |
+| GitHub Copilot | `.github/copilot-instructions.md` | `rails ai:context:copilot` |
+| JSON (generic) | `.ai-context.json` | `rails ai:context:json` |
+
+---
+
 ## Rake Tasks
 
 | Command | Description |
 |---------|-------------|
 | `rails ai:context` | Generate all context files (CLAUDE.md, .cursorrules, etc.) |
-| `rails ai:context_for[claude]` | Generate for a specific format |
+| `rails ai:context:claude` | Generate CLAUDE.md only |
+| `rails ai:context:cursor` | Generate .cursorrules only |
+| `rails ai:context:windsurf` | Generate .windsurfrules only |
+| `rails ai:context:copilot` | Generate .github/copilot-instructions.md only |
+| `rails ai:context:json` | Generate .ai-context.json only |
 | `rails ai:serve` | Start MCP server (stdio, for Claude Code) |
 | `rails ai:serve_http` | Start MCP server (HTTP, for remote clients) |
 | `rails ai:inspect` | Print introspection summary to stdout |
+
+> **zsh users:** The bracket syntax `rails ai:context_for[claude]` requires quoting in zsh (`rails 'ai:context_for[claude]'`). The named tasks above (`rails ai:context:claude`) work without quoting in any shell.
 
 ---
 

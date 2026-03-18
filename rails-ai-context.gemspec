@@ -32,8 +32,9 @@ Gem::Specification.new do |spec|
   spec.post_install_message = <<~MSG
     rails-ai-context installed! Quick start:
       rails generate rails_ai_context:install
-      rails ai:context     # generate CLAUDE.md, .cursorrules, etc.
-      rails ai:serve       # start MCP server for Claude Code / Cursor
+      rails ai:context         # generate all context files
+      rails ai:context:claude  # generate CLAUDE.md only (zsh-friendly)
+      rails ai:serve           # start MCP server for Claude Code / Cursor
   MSG
 
   spec.files = Dir.chdir(__dir__) do

@@ -71,9 +71,17 @@ module RailsAiContext
         say "=" * 50, :cyan
         say ""
         say "Quick start:", :yellow
-        say "  rails ai:context     # Regenerate context files"
-        say "  rails ai:serve       # Start MCP server (stdio)"
-        say "  rails ai:inspect     # Print introspection summary"
+        say "  rails ai:context         # Generate all context files"
+        say "  rails ai:context:claude   # Generate CLAUDE.md only"
+        say "  rails ai:context:cursor   # Generate .cursorrules only"
+        say "  rails ai:serve           # Start MCP server (stdio)"
+        say "  rails ai:inspect         # Print introspection summary"
+        say ""
+        say "Supported AI assistants:", :yellow
+        say "  Claude Code        → CLAUDE.md                        (rails ai:context:claude)"
+        say "  Cursor             → .cursorrules                     (rails ai:context:cursor)"
+        say "  Windsurf           → .windsurfrules                   (rails ai:context:windsurf)"
+        say "  GitHub Copilot     → .github/copilot-instructions.md  (rails ai:context:copilot)"
         say ""
         say "For Claude Code, add to your claude_desktop_config.json:", :yellow
         say '  { "mcpServers": { "rails": { "command": "rails", "args": ["ai:serve"], "cwd": "/path/to/your/app" } } }'

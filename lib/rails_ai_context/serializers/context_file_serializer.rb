@@ -29,7 +29,10 @@ module RailsAiContext
 
         formats.each do |fmt|
           filename = FORMAT_MAP[fmt]
-          next unless filename
+          unless filename
+            valid = FORMAT_MAP.keys.map(&:to_s).join(", ")
+            raise ArgumentError, "Unknown format: #{fmt}. Valid formats: #{valid}"
+          end
 
           filepath = File.join(output_dir, filename)
 
