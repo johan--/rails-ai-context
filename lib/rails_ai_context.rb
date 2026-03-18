@@ -44,6 +44,9 @@ end
 # Configuration
 require_relative "rails_ai_context/configuration"
 
+# Cache invalidation
+require_relative "rails_ai_context/fingerprinter"
+
 # Core introspection
 require_relative "rails_ai_context/introspector"
 require_relative "rails_ai_context/introspectors/schema_introspector"

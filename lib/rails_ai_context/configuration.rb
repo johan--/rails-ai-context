@@ -26,6 +26,9 @@ module RailsAiContext
     # Maximum depth for association traversal
     attr_accessor :max_association_depth
 
+    # TTL in seconds for cached introspection (default: 30)
+    attr_accessor :cache_ttl
+
     def initialize
       @server_name         = "rails-ai-context"
       @server_version      = RailsAiContext::VERSION
@@ -43,6 +46,7 @@ module RailsAiContext
         ActionMailbox::InboundEmail ActionMailbox::Record
       ]
       @max_association_depth = 2
+      @cache_ttl            = 30
     end
 
     def output_dir_for(app)

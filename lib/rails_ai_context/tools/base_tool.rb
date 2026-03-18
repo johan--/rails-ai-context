@@ -18,13 +18,25 @@ module RailsAiContext
           RailsAiContext.configuration
         end
 
-        # Cache introspection results for the lifetime of the server process
+        # Cache introspection results with TTL + fingerprint invalidation
         def cached_context
-          @cached_context ||= RailsAiContext.introspect
+          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          ttl = RailsAiContext.configuration.cache_ttl
+
+          if @cached_context && (now - @cache_timestamp) < ttl && !Fingerprinter.changed?(rails_app, @cache_fingerprint)
+            return @cached_context
+          end
+
+          @cached_context = RailsAiContext.introspect
+          @cache_timestamp = now
+          @cache_fingerprint = Fingerprinter.compute(rails_app)
+          @cached_context
         end
 
         def reset_cache!
           @cached_context = nil
+          @cache_timestamp = nil
+          @cache_fingerprint = nil
         end
 
         # Helper: wrap text in an MCP::Tool::Response
