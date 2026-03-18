@@ -72,6 +72,9 @@ jobs:
       - name: Push to RubyGems
         uses: rubygems/release-gem@v1
 
+      - name: Build gem for release asset
+        run: gem build rails-ai-context.gemspec
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
