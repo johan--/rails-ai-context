@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Introspector presets** — `:standard` (8 core introspectors, fast) and `:full` (all 21, thorough) via `config.preset = :standard`
 - **`.mcp.json` auto-discovery** — Install generator creates `.mcp.json` so Claude Code and Cursor auto-detect the MCP server with zero manual config
 - **Automated release workflow** — GitHub Actions publishes to RubyGems via trusted publishing when a version tag is pushed
 - **Version consistency check** — Release workflow verifies git tag matches `version.rb` before publishing

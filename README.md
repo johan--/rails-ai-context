@@ -165,6 +165,14 @@ In addition to tools, the gem registers MCP resources that AI clients can read d
 ```ruby
 # config/initializers/rails_ai_context.rb
 RailsAiContext.configure do |config|
+  # Introspector presets:
+  #   :standard — 8 core introspectors (default, fast)
+  #   :full     — all 21 introspectors (thorough)
+  config.preset = :standard
+
+  # Or cherry-pick on top of a preset:
+  # config.introspectors += %i[views turbo auth api]
+
   # Exclude internal models from introspection
   config.excluded_models += %w[AdminUser InternalAuditLog]
 
@@ -172,15 +180,12 @@ RailsAiContext.configure do |config|
   config.excluded_paths += %w[vendor/bundle]
 
   # Auto-mount HTTP MCP endpoint (for remote AI clients)
-  config.auto_mount = true
-  config.http_path  = "/mcp"
-  config.http_port  = 6029
+  # config.auto_mount = true
+  # config.http_path  = "/mcp"
+  # config.http_port  = 6029
 
   # Cache TTL for MCP tool responses (seconds)
   config.cache_ttl = 30
-
-  # Enable Postgres row count stats (opt-in)
-  # config.introspectors += [:database_stats]
 end
 ```
 

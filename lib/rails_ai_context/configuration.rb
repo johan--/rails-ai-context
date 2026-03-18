@@ -2,10 +2,15 @@
 
 module RailsAiContext
   class Configuration
+    PRESETS = {
+      standard: %i[schema models routes jobs gems conventions controllers tests],
+      full: %i[schema models routes jobs gems conventions stimulus controllers views turbo i18n config active_storage action_text auth api tests rake_tasks assets devops action_mailbox]
+    }.freeze
+
     # MCP server settings
     attr_accessor :server_name, :server_version
 
-    # Which introspectors to run (all by default)
+    # Which introspectors to run
     attr_accessor :introspectors
 
     # Paths to exclude from code search
@@ -32,7 +37,7 @@ module RailsAiContext
     def initialize
       @server_name         = "rails-ai-context"
       @server_version      = RailsAiContext::VERSION
-      @introspectors       = %i[schema models routes jobs gems conventions stimulus controllers views turbo i18n config active_storage action_text auth api tests rake_tasks assets devops action_mailbox]
+      @introspectors       = PRESETS[:standard].dup
       @excluded_paths      = %w[node_modules tmp log vendor .git]
       @auto_mount          = false
       @http_path           = "/mcp"
@@ -47,6 +52,12 @@ module RailsAiContext
       ]
       @max_association_depth = 2
       @cache_ttl            = 30
+    end
+
+    def preset=(name)
+      name = name.to_sym
+      raise ArgumentError, "Unknown preset: #{name}. Valid presets: #{PRESETS.keys.join(", ")}" unless PRESETS.key?(name)
+      @introspectors = PRESETS[name].dup
     end
 
     def output_dir_for(app)

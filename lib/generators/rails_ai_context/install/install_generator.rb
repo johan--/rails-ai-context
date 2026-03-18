@@ -27,20 +27,24 @@ module RailsAiContext
           # frozen_string_literal: true
 
           RailsAiContext.configure do |config|
-            # MCP server name (shown to AI clients)
-            # config.server_name = "rails-ai-context"
+            # Introspector preset:
+            #   :standard — 8 core introspectors (schema, models, routes, jobs, gems, conventions, controllers, tests)
+            #   :full     — all 21 introspectors (adds views, turbo, auth, API, config, assets, devops, etc.)
+            # config.preset = :standard
 
-            # Auto-mount HTTP MCP endpoint at /mcp
-            # Set to true if you want remote MCP clients to connect
-            # config.auto_mount = false
-            # config.http_path  = "/mcp"
-            # config.http_port  = 6029
+            # Or cherry-pick individual introspectors:
+            # config.introspectors += %i[views turbo auth api]
 
             # Models to exclude from introspection
             # config.excluded_models += %w[AdminUser InternalThing]
 
             # Paths to exclude from code search
             # config.excluded_paths += %w[vendor/bundle]
+
+            # Auto-mount HTTP MCP endpoint at /mcp
+            # config.auto_mount = false
+            # config.http_path  = "/mcp"
+            # config.http_port  = 6029
           end
         RUBY
 
