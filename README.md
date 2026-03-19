@@ -65,6 +65,11 @@ your-rails-app/
 │       ├── rails-controllers.mdc                         globs: app/controllers/**
 │       └── rails-mcp-tools.mdc                           alwaysApply: true
 │
+├── ⚡ OpenCode
+│   ├── AGENTS.md                                        native OpenCode context
+│   ├── app/models/AGENTS.md                             auto-loaded when editing models
+│   └── app/controllers/AGENTS.md                        auto-loaded when editing controllers
+│
 ├── 🔵 Windsurf
 │   ├── .windsurfrules                                    ≤5,800 chars (6K limit)
 │   └── .windsurf/rules/

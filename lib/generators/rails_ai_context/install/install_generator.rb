@@ -116,6 +116,7 @@ module RailsAiContext
         say ""
         say "Generated files per AI tool:", :yellow
         say "  Claude Code    → CLAUDE.md + .claude/rules/*.md"
+        say "  OpenCode       → AGENTS.md"
         say "  Cursor         → .cursorrules + .cursor/rules/*.mdc"
         say "  Windsurf       → .windsurfrules + .windsurf/rules/*.md"
         say "  GitHub Copilot → .github/copilot-instructions.md + .github/instructions/*.instructions.md"

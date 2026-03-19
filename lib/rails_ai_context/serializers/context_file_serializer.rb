@@ -3,13 +3,14 @@
 module RailsAiContext
   module Serializers
     # Orchestrates writing context files to disk in various formats.
-    # Supports: CLAUDE.md, .cursorrules, .windsurfrules, .github/copilot-instructions.md, JSON
+    # Supports: CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules, .github/copilot-instructions.md, JSON
     # Also generates split rule files for AI tools that support them.
     class ContextFileSerializer
       attr_reader :context, :format
 
       FORMAT_MAP = {
         claude:    "CLAUDE.md",
+        opencode:  "AGENTS.md",
         cursor:    ".cursorrules",
         windsurf:  ".windsurfrules",
         copilot:   ".github/copilot-instructions.md",
@@ -63,6 +64,7 @@ module RailsAiContext
         case fmt
         when :json     then JsonSerializer.new(context).call
         when :claude   then ClaudeSerializer.new(context).call
+        when :opencode then OpencodeSerializer.new(context).call
         when :cursor   then RulesSerializer.new(context).call
         when :windsurf then WindsurfSerializer.new(context).call
         when :copilot  then CopilotSerializer.new(context).call
@@ -85,6 +87,12 @@ module RailsAiContext
 
         if formats.include?(:windsurf)
           result = WindsurfRulesSerializer.new(context).call(output_dir)
+          written.concat(result[:written])
+          skipped.concat(result[:skipped])
+        end
+
+        if formats.include?(:opencode)
+          result = OpencodeRulesSerializer.new(context).call(output_dir)
           written.concat(result[:written])
           skipped.concat(result[:skipped])
         end

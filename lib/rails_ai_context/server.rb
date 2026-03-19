@@ -76,12 +76,14 @@ module RailsAiContext
       $stderr.puts "[rails-ai-context] Tools: #{TOOLS.map { |t| t.tool_name }.join(', ')}"
       maybe_start_live_reload(server)
 
-      require "rackup"
-      Rackup::Handler.default.run(rack_app, Host: config.http_bind, Port: config.http_port)
-    rescue LoadError
-      # Fallback for older rack without rackup gem
-      require "rack/handler"
-      Rack::Handler.default.run(rack_app, Host: config.http_bind, Port: config.http_port)
+      begin
+        require "rackup"
+        Rackup::Handler.default.run(rack_app, Host: config.http_bind, Port: config.http_port)
+      rescue LoadError
+        # Fallback for older rack without rackup gem
+        require "rack/handler"
+        Rack::Handler.default.run(rack_app, Host: config.http_bind, Port: config.http_port)
+      end
     end
 
     # Conditionally start live reload based on configuration.
@@ -94,9 +96,10 @@ module RailsAiContext
       return if mode == false
 
       begin
-        @live_reload = LiveReload.new(app, mcp_server)
-        @live_reload.start
-      rescue LoadError => e
+        live_reload = LiveReload.new(app, mcp_server)
+        live_reload.start
+        @live_reload = live_reload
+      rescue LoadError
         if mode == true
           raise LoadError, "Live reload requires the `listen` gem. Add to your Gemfile: gem 'listen', group: :development"
         end

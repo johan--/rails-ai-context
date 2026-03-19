@@ -8,7 +8,7 @@ echo 'Fetching gem metadata from https://rubygems.org...'
 sleep 0.3
 echo 'Resolving dependencies...'
 sleep 0.3
-echo 'Installing rails-ai-context 0.8.0'
+echo 'Installing rails-ai-context 0.8.1'
 echo ''
 sleep 1
 
@@ -54,6 +54,12 @@ sleep 0.08
 echo '  ✅ .claude/rules/rails-models.md'
 sleep 0.08
 echo '  ✅ .claude/rules/rails-mcp-tools.md'
+sleep 0.08
+echo '  ✅ AGENTS.md'
+sleep 0.08
+echo '  ✅ app/models/AGENTS.md'
+sleep 0.08
+echo '  ✅ app/controllers/AGENTS.md'
 sleep 0.08
 echo '  ✅ .cursorrules'
 sleep 0.08

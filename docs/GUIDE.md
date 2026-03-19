@@ -125,7 +125,7 @@ end
 
 ## Generated Files
 
-`rails ai:context` generates **17 files** across all AI assistants:
+`rails ai:context` generates **20 files** across all AI assistants:
 
 ### Claude Code (4 files)
 
@@ -135,6 +135,14 @@ end
 | `.claude/rules/rails-schema.md` | Database table listing | Auto-loaded by Claude Code alongside CLAUDE.md. |
 | `.claude/rules/rails-models.md` | Model listing with associations | Auto-loaded by Claude Code alongside CLAUDE.md. |
 | `.claude/rules/rails-mcp-tools.md` | Full MCP tool reference | Parameters, detail levels, pagination, workflow guide. |
+
+### OpenCode (3 files)
+
+| File | Purpose | Notes |
+|------|---------|-------|
+| `AGENTS.md` | Main context file | Native OpenCode format. ≤150 lines in compact mode. OpenCode also reads CLAUDE.md as fallback. |
+| `app/models/AGENTS.md` | Model reference | Auto-loaded by OpenCode when reading files in `app/models/`. |
+| `app/controllers/AGENTS.md` | Controller reference | Auto-loaded by OpenCode when reading files in `app/controllers/`. |
 
 ### Cursor (5 files)
 
@@ -181,9 +189,10 @@ Commit **all files except `.ai-context.json`** (which is gitignored). This gives
 
 | Command | Mode | Format | Description |
 |---------|------|--------|-------------|
-| `rails ai:context` | compact | all | Generate all 17 context files |
+| `rails ai:context` | compact | all | Generate all 18 context files |
 | `rails ai:context:full` | full | all | Generate all files in full mode |
 | `rails ai:context:claude` | compact | Claude | CLAUDE.md + .claude/rules/ |
+| `rails ai:context:opencode` | compact | OpenCode | AGENTS.md + per-directory AGENTS.md |
 | `rails ai:context:cursor` | compact | Cursor | .cursorrules + .cursor/rules/ |
 | `rails ai:context:windsurf` | compact | Windsurf | .windsurfrules + .windsurf/rules/ |
 | `rails ai:context:copilot` | compact | Copilot | copilot-instructions.md + .github/instructions/ |
@@ -204,7 +213,7 @@ Commit **all files except `.ai-context.json`** (which is gitignored). This gives
 
 | Command | Description |
 |---------|-------------|
-| `rails ai:doctor` | Run 12 diagnostic checks. Reports pass/warn/fail with fix suggestions. AI readiness score (0-100). |
+| `rails ai:doctor` | Run 13 diagnostic checks. Reports pass/warn/fail with fix suggestions. AI readiness score (0-100). |
 | `rails ai:watch` | Watch for file changes and auto-regenerate context files. Requires `listen` gem. |
 | `rails ai:inspect` | Print introspection summary to stdout. Useful for debugging. |
 
@@ -714,6 +723,31 @@ config.introspectors = %i[schema models routes gems auth api]
 | `alwaysApply: true` | Every conversation (project overview, MCP tools) |
 | `globs: ["app/models/**/*.rb"]` | When editing files matching the glob pattern |
 | `alwaysApply: false` + `description` | When the AI decides it's relevant based on description |
+
+### OpenCode
+
+**MCP config:** Add to `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "rails-ai-context": {
+      "type": "local",
+      "command": ["bundle", "exec", "rails", "ai:serve"]
+    }
+  }
+}
+```
+
+**Context files loaded:**
+- `AGENTS.md` — project overview + MCP tool guide, read at conversation start
+- `app/models/AGENTS.md` — model listing, auto-loaded when agent reads model files
+- `app/controllers/AGENTS.md` — controller listing, auto-loaded when agent reads controller files
+- Falls back to `CLAUDE.md` if no `AGENTS.md` exists
+
+OpenCode uses **per-directory lazy-loading**: when the agent reads a file, it walks up the directory tree and auto-loads any `AGENTS.md` it finds. This is how split rules work — no globs or frontmatter needed.
+
+**MCP tools:** Available via `opencode.json` config above.
 
 ### Windsurf
 
