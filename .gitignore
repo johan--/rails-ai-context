@@ -10,3 +10,6 @@
 *.gem
 Gemfile.lock
 spec/internal/log/
+
+# MCP Registry auth tokens
+.mcpregistry_*
