@@ -92,6 +92,8 @@ module RailsAiContext
         end
       end
 
+      MAX_FILE_SIZE = 2_000_000 # 2MB safety limit
+
       private_class_method def self.read_view_file(path)
         views_dir = Rails.root.join("app", "views")
         full_path = views_dir.join(path)
@@ -102,6 +104,9 @@ module RailsAiContext
         end
         unless File.exist?(full_path)
           return text_response("View not found: #{path}")
+        end
+        if File.size(full_path) > MAX_FILE_SIZE
+          return text_response("File too large: #{path} (#{File.size(full_path)} bytes)")
         end
 
         content = File.read(full_path)

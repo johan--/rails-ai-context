@@ -106,7 +106,11 @@ module RailsAiContext
 
       private_class_method def self.search_with_ruby(pattern, search_path, file_type, max_results, root)
         results = []
-        regex = Regexp.new(pattern, Regexp::IGNORECASE)
+        begin
+          regex = Regexp.new(pattern, Regexp::IGNORECASE, timeout: 2)
+        rescue RegexpError => e
+          return [ { file: "error", line_number: 0, content: "Invalid regex: #{e.message}" } ]
+        end
         glob = file_type ? "**/*.#{file_type}" : "**/*.{rb,js,erb,yml,yaml,json}"
         excluded = RailsAiContext.configuration.excluded_paths
 

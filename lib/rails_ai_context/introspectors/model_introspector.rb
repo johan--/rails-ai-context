@@ -169,8 +169,8 @@ module RailsAiContext
         macros = {}
 
         macros[:has_secure_password] = true if source.match?(/\bhas_secure_password\b/)
-        macros[:encrypts] = source.scan(/\bencrypts\s+(.+)/).flat_map { |m| m[0].scan(/:(\w+)/).flatten } if source.match?(/\bencrypts\s+:/)
-        macros[:normalizes] = source.scan(/\bnormalizes\s+(.+)/).flat_map { |m| m[0].scan(/:(\w+)/).flatten } if source.match?(/\bnormalizes\s+:/)
+        macros[:encrypts] = source.scan(/\bencrypts\s+(.+?)$/).flat_map { |m| m[0].scan(/:(\w+)/).flatten } if source.match?(/\bencrypts\s+:/)
+        macros[:normalizes] = source.scan(/\bnormalizes\s+(.+?)$/).flat_map { |m| m[0].scan(/:(\w+)/).flatten } if source.match?(/\bnormalizes\s+:/)
         macros[:has_one_attached] = source.scan(/\bhas_one_attached\s+:(\w+)/).flatten if source.match?(/\bhas_one_attached\s+:/)
         macros[:has_many_attached] = source.scan(/\bhas_many_attached\s+:(\w+)/).flatten if source.match?(/\bhas_many_attached\s+:/)
         macros[:has_rich_text] = source.scan(/\bhas_rich_text\s+:(\w+)/).flatten if source.match?(/\bhas_rich_text\s+:/)
@@ -180,7 +180,7 @@ module RailsAiContext
         macros[:store] = source.scan(/\bstore(?:_accessor)?\s+:(\w+)/).flatten if source.match?(/\bstore(?:_accessor)?\s+:/)
 
         # Delegations
-        delegations = source.scan(/\bdelegate\s+(.+?),\s*to:\s*:(\w+)/).map do |methods_str, target|
+        delegations = source.scan(/\bdelegate\s+(.+?),\s*to:\s*:(\w+)/m).map do |methods_str, target|
           { methods: methods_str.scan(/:(\w+)/).flatten, to: target }
         end
         macros[:delegations] = delegations if delegations.any?
