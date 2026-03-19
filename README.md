@@ -7,6 +7,10 @@
 [![CI](https://github.com/crisnahine/rails-ai-context/actions/workflows/ci.yml/badge.svg)](https://github.com/crisnahine/rails-ai-context/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![Token Comparison](https://raw.githubusercontent.com/crisnahine/rails-ai-context/main/docs/token-comparison.jpeg)
+
+*Built by a Rails dev who got tired of burning tokens explaining his app to AI assistants every single session.*
+
 ![Demo](https://raw.githubusercontent.com/crisnahine/rails-ai-context/main/demo.gif)
 
 ---
