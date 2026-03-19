@@ -51,7 +51,18 @@ https://github.com/user-attachments/assets/171f52ae-bd30-43f6-a44f-bcfdda7fc139
 | Discovery overhead | ~8 calls | 0 calls | 0 calls |
 | Structured MCP queries | No | No | Yes — 5 MCP calls replace file reads |
 
-**~16,600 fewer tokens per task** vs no gem at all. On larger projects, the savings compound significantly.
+**~16,600 fewer tokens per task** vs no gem at all.
+
+> **This was a simple task on a small 5-model app.** Real-world tasks are 3-10x more complex.
+> A feature touching auth + payments + mailers + tests on a 50-model app? Without the gem, Claude reads `db/schema.rb` (2,000+ lines), every model file, every controller, every view — easily 200K+ tokens per session. With rails-ai-context, MCP tools return only what's needed: `rails_get_schema(table:"users")` returns 25 lines instead of 2,000. **The bigger your app and the harder the task, the more you save.**
+
+| App size | Without gem | With rails-ai-context | Savings |
+|----------|-------------|----------------------|---------|
+| Small (5 models) | 45K tokens | 29K tokens | 37% |
+| Medium (30 models) | ~150K tokens | ~60K tokens | ~60% |
+| Large (100+ models) | ~500K+ tokens | ~100K tokens | ~80% |
+
+*Medium/large estimates based on schema.rb scaling (40 lines/table), model file scaling, and MCP summary-first workflow eliminating full-file reads.*
 
 ---
 
