@@ -455,6 +455,15 @@ In addition to tools, the gem registers static MCP resources that AI clients can
 
 ## MCP Server Setup
 
+### MCP Registry
+
+This server is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.crisnahine/rails-ai-context`.
+
+```bash
+# Search for it
+curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=rails-ai-context"
+```
+
 ### Auto-discovery (recommended)
 
 The install generator creates `.mcp.json` in your project root:

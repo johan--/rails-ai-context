@@ -3,6 +3,7 @@
 **Turn any Rails app into an AI-ready codebase — one gem install.**
 
 [![Gem Version](https://badge.fury.io/rb/rails-ai-context.svg)](https://rubygems.org/gems/rails-ai-context)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-green)](https://registry.modelcontextprotocol.io)
 [![CI](https://github.com/crisnahine/rails-ai-context/actions/workflows/ci.yml/badge.svg)](https://github.com/crisnahine/rails-ai-context/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -178,6 +179,8 @@ That's **~95% fewer tokens** for the same understanding. The AI gets a compact o
 ## MCP Server Setup
 
 The install generator creates `.mcp.json` — **Claude Code and Cursor auto-detect it**. No manual config needed.
+
+This server is also listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.crisnahine/rails-ai-context`.
 
 To start manually: `rails ai:serve`
 
