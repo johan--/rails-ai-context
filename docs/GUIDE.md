@@ -688,6 +688,9 @@ These run by default. Fast and cover core Rails structure.
 | `controllers` | Actions, filters (before/after/around with only/except), strong params methods, parent class, API controller detection, concerns. |
 | `tests` | Test framework (rspec/minitest), factories/fixtures with locations and counts, system tests, CI config files, coverage tool, test helpers, VCR cassettes. |
 | `migrations` | Total count, schema version, pending migrations, recent migration history with detected actions (create_table, add_column, etc.), migration statistics. |
+| `stimulus` | Stimulus controllers with targets, values (with types), actions, outlets, classes. Extracted from JS/TS files. |
+| `view_templates` | View file contents, partial references, Stimulus data attributes, UI pattern extraction, model field usage in partials. |
+| `design_tokens` | Auto-detects CSS framework (Tailwind v3/v4, Bootstrap, Sass, plain CSS) and extracts design tokens from config files and built CSS. |
 
 ### Full preset (28 introspectors)
 
@@ -695,7 +698,6 @@ Includes all standard introspectors plus:
 
 | Introspector | What it discovers |
 |-------------|-------------------|
-| `stimulus` | Stimulus controllers with targets, values (with types), actions, outlets, classes. Extracted from JS/TS files. |
 | `views` | Layouts, templates grouped by controller, partials (per-controller and shared), helpers with methods, template engines (erb, haml, slim), view components. |
 | `turbo` | Turbo Frames (IDs and files), Turbo Stream templates, model broadcasts (`broadcasts_to`, `broadcasts`). |
 | `i18n` | Default locale, available locales, locale files with key counts, backend class, parse errors. |
@@ -712,7 +714,7 @@ Includes all standard introspectors plus:
 | `middleware` | Custom Rack middleware in app/middleware/ with detected patterns (auth, rate limiting, tenant isolation, logging). Full middleware stack. |
 | `engines` | Mounted Rails engines from routes.rb with paths and descriptions for 23+ known engines (Sidekiq::Web, Flipper::UI, PgHero, ActiveAdmin, etc.). |
 | `multi_database` | Multiple databases, replicas, sharding config, model-specific `connects_to` declarations. database.yml parsing fallback. |
-| `database_stats` | PostgreSQL approximate row counts via `pg_stat_user_tables`. Opt-in, requires PostgreSQL. |
+| `database_stats` | PostgreSQL approximate row counts via `pg_stat_user_tables`. **Opt-in only** — not in any preset, add manually: `config.introspectors += [:database_stats]`. |
 
 ### Enabling the full preset
 
