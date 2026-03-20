@@ -24,19 +24,32 @@ module RailsAiContext
           offset: {
             type: "integer",
             description: "Skip routes for pagination. Default: 0."
+          },
+          app_only: {
+            type: "boolean",
+            description: "Filter out internal Rails routes (Active Storage, Action Mailbox, Conductor, etc.). Default: true."
           }
         }
       )
 
+      INTERNAL_PREFIXES = %w[
+        action_mailbox/ active_storage/ rails/ conductor/
+      ].freeze
+
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
 
-      def self.call(controller: nil, detail: "standard", limit: nil, offset: 0, server_context: nil)
+      def self.call(controller: nil, detail: "standard", limit: nil, offset: 0, app_only: true, server_context: nil)
         routes = cached_context[:routes]
         return text_response("Route introspection not available. Add :routes to introspectors.") unless routes
         return text_response("Route introspection failed: #{routes[:error]}") if routes[:error]
 
         by_controller = routes[:by_controller] || {}
         offset = [ offset.to_i, 0 ].max
+
+        # Filter out internal Rails routes by default
+        if app_only
+          by_controller = by_controller.reject { |k, _| INTERNAL_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
+        end
 
         # Filter by controller
         if controller
@@ -70,7 +83,8 @@ module RailsAiContext
               count += 1
               next if count <= offset
               break if count > offset + limit
-              ctrl_lines << "- `#{r[:verb]}` `#{r[:path]}` → #{r[:action]}"
+              name_part = r[:name] ? " `#{r[:name]}`" : ""
+              ctrl_lines << "- `#{r[:verb]}` `#{r[:path]}` → #{r[:action]}#{name_part}"
             end
             if ctrl_lines.any?
               lines << "## #{ctrl}"

@@ -27,6 +27,10 @@ module RailsAiContext
           max_results: {
             type: "integer",
             description: "Maximum number of results. Default: 30, max: 100."
+          },
+          context_lines: {
+            type: "integer",
+            description: "Lines of context before and after each match (like grep -C). Default: 0, max: 5."
           }
         },
         required: [ "pattern" ]
@@ -34,7 +38,7 @@ module RailsAiContext
 
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
 
-      def self.call(pattern:, path: nil, file_type: nil, max_results: 30, server_context: nil)
+      def self.call(pattern:, path: nil, file_type: nil, max_results: 30, context_lines: 0, server_context: nil)
         root = Rails.root.to_s
 
         # Validate file_type to prevent injection
@@ -42,9 +46,10 @@ module RailsAiContext
           return text_response("Invalid file_type: must contain only alphanumeric characters.")
         end
 
-        # Cap max_results
+        # Cap max_results and context_lines
         max_results = [ max_results.to_i, MAX_RESULTS_CAP ].min
         max_results = 30 if max_results < 1
+        context_lines = [ [ context_lines.to_i, 0 ].max, 5 ].min
 
         search_path = path ? File.join(root, path) : root
 
@@ -64,7 +69,7 @@ module RailsAiContext
         end
 
         results = if ripgrep_available?
-                    search_with_ripgrep(pattern, search_path, file_type, max_results, root)
+                    search_with_ripgrep(pattern, search_path, file_type, max_results, root, context_lines)
         else
                     search_with_ruby(pattern, search_path, file_type, max_results, root)
         end
@@ -84,8 +89,9 @@ module RailsAiContext
         @rg_available ||= system("which rg > /dev/null 2>&1")
       end
 
-      private_class_method def self.search_with_ripgrep(pattern, search_path, file_type, max_results, root)
+      private_class_method def self.search_with_ripgrep(pattern, search_path, file_type, max_results, root, ctx_lines = 0)
         cmd = [ "rg", "--no-heading", "--line-number", "--max-count", max_results.to_s ]
+        cmd.push("-C", ctx_lines.to_s) if ctx_lines > 0
 
         RailsAiContext.configuration.excluded_paths.each do |p|
           cmd << "--glob=!#{p}"

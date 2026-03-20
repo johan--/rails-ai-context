@@ -579,7 +579,7 @@ Both transports are **read-only** — they expose the same 13 tools and never mo
 RailsAiContext.configure do |config|
   # --- Introspectors ---
 
-  # Presets: :standard (12 core, default) or :full (all 28)
+  # Presets: :standard (13 core, default) or :full (all 28)
   config.preset = :standard
 
   # Cherry-pick on top of a preset
@@ -636,7 +636,7 @@ end
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `preset` | Symbol | `:standard` | Introspector preset (`:standard` or `:full`) |
-| `introspectors` | Array | 12 core symbols | Which introspectors to run |
+| `introspectors` | Array | 13 core symbols | Which introspectors to run |
 | `context_mode` | Symbol | `:compact` | `:compact` or `:full` |
 | `claude_max_lines` | Integer | `150` | Max lines for CLAUDE.md in compact mode |
 | `max_tool_response_chars` | Integer | `120_000` | Safety cap for MCP tool responses |
@@ -673,7 +673,7 @@ All split rules include an app overview file, so no context is lost when root fi
 
 ## Introspectors — Full List
 
-### Standard preset (12 introspectors)
+### Standard preset (13 introspectors)
 
 These run by default. Fast and cover core Rails structure.
 

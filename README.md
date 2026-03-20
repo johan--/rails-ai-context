@@ -203,7 +203,7 @@ Root files (CLAUDE.md, AGENTS.md, etc.) use **section markers** — your custom 
 | **DevOps** | Puma, Procfile, Docker, deployment tools, asset pipeline |
 | **Architecture** | Service objects, STI, polymorphism, state machines, multi-tenancy, engines |
 
-29 introspectors total. The `:standard` preset runs 12 core ones by default; use `:full` for 28 (`database_stats` is opt-in, PostgreSQL only).
+29 introspectors total. The `:standard` preset runs 13 core ones by default; use `:full` for 28 (`database_stats` is opt-in, PostgreSQL only).
 
 ---
 
@@ -257,7 +257,7 @@ end
 ```ruby
 # config/initializers/rails_ai_context.rb
 RailsAiContext.configure do |config|
-  # Presets: :standard (12 introspectors, default) or :full (all 28)
+  # Presets: :standard (13 introspectors, default) or :full (all 28)
   config.preset = :standard
 
   # Cherry-pick on top of a preset
@@ -291,7 +291,7 @@ end
 | Option | Default | Description |
 |--------|---------|-------------|
 | `preset` | `:standard` | Introspector preset (`:standard` or `:full`) |
-| `introspectors` | 12 core | Array of introspector symbols |
+| `introspectors` | 13 core | Array of introspector symbols |
 | `context_mode` | `:compact` | `:compact` (≤150 lines) or `:full` (dump everything) |
 | `claude_max_lines` | `150` | Max lines for CLAUDE.md in compact mode |
 | `max_tool_response_chars` | `120_000` | Safety cap for MCP tool responses |

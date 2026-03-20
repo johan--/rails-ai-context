@@ -135,10 +135,15 @@ module RailsAiContext
           end
         end
 
-        # Concerns
+        # Concerns — filter out internal Rails modules
         if data[:concerns]&.any?
-          lines << "" << "## Concerns"
-          lines << data[:concerns].map { |c| "- #{c}" }.join("\n")
+          app_concerns = data[:concerns].reject do |c|
+            c.match?(/\A(ActiveRecord|ActiveModel|ActiveSupport|ActionText|ActionMailbox|ActiveStorage|GeneratedAssociationMethods|Kernel|JSON|PP|Marshal|MessagePack|GeneratedRelationMethods)/)
+          end
+          if app_concerns.any?
+            lines << "" << "## Concerns"
+            lines << app_concerns.map { |c| "- #{c}" }.join("\n")
+          end
         end
 
         # Key instance methods — include signatures from source if available

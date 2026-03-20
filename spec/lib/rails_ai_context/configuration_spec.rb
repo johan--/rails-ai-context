@@ -40,7 +40,7 @@ RSpec.describe RailsAiContext::Configuration do
   describe "#preset=" do
     it "sets introspectors to standard preset" do
       config.preset = :standard
-      expect(config.introspectors).to eq(%i[schema models routes jobs gems conventions controllers tests migrations stimulus view_templates design_tokens])
+      expect(config.introspectors).to eq(%i[schema models routes jobs gems conventions controllers tests migrations stimulus view_templates design_tokens config])
     end
 
     it "sets introspectors to full preset" do
@@ -62,7 +62,7 @@ RSpec.describe RailsAiContext::Configuration do
       config.preset = :standard
       config.introspectors += %i[views turbo]
       expect(config.introspectors).to include(:views, :turbo)
-      expect(config.introspectors.size).to eq(14)
+      expect(config.introspectors.size).to eq(15)
     end
   end
 

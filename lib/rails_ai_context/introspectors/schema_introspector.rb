@@ -138,8 +138,13 @@ module RailsAiContext
             tables[current_table] = { columns: [], indexes: [], foreign_keys: [] }
           elsif current_table && (match = line.match(/t\.(\w+)\s+"(\w+)"/))
             tables[current_table][:columns] << { name: match[2], type: match[1] }
-          elsif (match = line.match(/add_index\s+"(\w+)",\s+\[?"(\w+)"/))
-            tables[match[1]]&.dig(:indexes)&.push({ columns: match[2] })
+          elsif (match = line.match(/add_index\s+"(\w+)",\s+(.+)/))
+            table_name = match[1]
+            rest = match[2]
+            cols = rest.scan(/(?::|\")(\w+)/).flatten
+            unique = rest.include?("unique: true")
+            idx_name = rest.match(/name:\s*"(\w+)"/)&.send(:[], 1)
+            tables[table_name]&.dig(:indexes)&.push({ name: idx_name, columns: cols, unique: unique }.compact) if cols.any?
           end
         end
 
@@ -164,9 +169,9 @@ module RailsAiContext
         end
 
         # Match CREATE INDEX / CREATE UNIQUE INDEX
-        content.scan(/CREATE (?:UNIQUE )?INDEX (\w+) ON (?:public\.)?(\w+).*?\((.+?)\)/m) do |idx_name, table, cols|
-          col_list = cols.scan(/\w+/).first
-          tables[table]&.dig(:indexes)&.push({ name: idx_name, columns: col_list })
+        content.scan(/CREATE (UNIQUE )?INDEX (\w+) ON (?:public\.)?(\w+).*?\((.+?)\)/m) do |unique, idx_name, table, cols|
+          col_list = cols.scan(/\w+/)
+          tables[table]&.dig(:indexes)&.push({ name: idx_name, columns: col_list, unique: !!unique })
         end
 
         # Match ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY (handles multi-line)

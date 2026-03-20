@@ -26,6 +26,9 @@ module RailsAiContext
       private
 
       def extract_routes
+        # Force Rails to reload routes if routes.rb has changed
+        app.routes_reloader&.execute_if_updated rescue nil
+
         app.routes.routes.filter_map do |route|
           next if route.respond_to?(:internal?) && route.internal?
           next if route.defaults[:controller].blank?

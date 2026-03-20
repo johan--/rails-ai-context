@@ -52,10 +52,25 @@ module RailsAiContext
       end
 
       def extract_values(content)
-        match = content.match(/static\s+values\s*=\s*\{([^}]*)\}/m)
+        match = content.match(/static\s+values\s*=\s*\{(.*?)\}/m)
         return {} unless match
 
-        match[1].scan(/(\w+)\s*:\s*(\w+)/).to_h
+        body = match[1]
+        values = {}
+
+        # Handle complex format: name: { type: Type, default: val }
+        body.scan(/(\w+)\s*:\s*\{([^}]+)\}/).each do |name, inner|
+          type = inner.match(/type:\s*(\w+)/)&.send(:[], 1) || "Object"
+          default = inner.match(/default:\s*(\S+)/)&.send(:[], 1)&.chomp(",")
+          values[name] = default ? "#{type} (default: #{default})" : type
+        end
+
+        # Handle simple format: name: Type (single line or multi-line)
+        body.scan(/(\w+)\s*:\s*([A-Z]\w+)/).each do |name, type|
+          values[name] ||= type
+        end
+
+        values
       end
 
       def extract_actions(content)
