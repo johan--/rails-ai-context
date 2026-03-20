@@ -56,7 +56,9 @@ module RailsAiContext
             ctrl_templates = templates.select { |k, _| k.start_with?("#{ctrl}/") }
             lines << "## #{ctrl}/ (#{ctrl_templates.size} files)"
             ctrl_templates.sort.each do |name, meta|
-              lines << "- #{File.basename(name)} — #{meta[:lines]} lines"
+              parts = meta[:partials]&.any? ? " renders: #{meta[:partials].join(', ')}" : ""
+              stim = meta[:stimulus]&.any? ? " stimulus: #{meta[:stimulus].join(', ')}" : ""
+              lines << "- #{File.basename(name)} (#{meta[:lines]} lines)#{parts}#{stim}"
             end
             lines << ""
           end

@@ -141,13 +141,43 @@ module RailsAiContext
           lines << data[:concerns].map { |c| "- #{c}" }.join("\n")
         end
 
-        # Key instance methods
+        # Key instance methods — include signatures from source if available
         if data[:instance_methods]&.any?
           lines << "" << "## Key instance methods"
-          lines << data[:instance_methods].first(15).map { |m| "- `#{m}`" }.join("\n")
+          signatures = extract_method_signatures(name)
+          if signatures&.any?
+            signatures.first(15).each { |s| lines << "- `#{s}`" }
+          else
+            lines << data[:instance_methods].first(15).map { |m| "- `#{m}`" }.join("\n")
+          end
         end
 
         lines.join("\n")
+      end
+
+      # Extract public method signatures (name + params) from model source
+      private_class_method def self.extract_method_signatures(model_name)
+        path = Rails.root.join("app", "models", "#{model_name.underscore}.rb")
+        return nil unless File.exist?(path)
+        return nil if File.size(path) > MAX_MODEL_SIZE
+
+        source = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        signatures = []
+        in_private = false
+
+        source.each_line do |line|
+          in_private = true if line.match?(/\A\s*private\s*$/)
+          next if in_private
+
+          if (match = line.match(/\A\s*def\s+((?!self\.)[\w?!]+(?:\(([^)]*)\))?)/))
+            name = match[1]
+            signatures << name unless name.start_with?("initialize")
+          end
+        end
+
+        signatures
+      rescue
+        nil
       end
 
       MAX_MODEL_SIZE = 2_000_000 # 2MB safety limit
