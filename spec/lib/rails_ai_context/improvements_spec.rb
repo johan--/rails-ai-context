@@ -123,31 +123,74 @@ RSpec.describe "Token-saving improvements" do
   end
 
   describe "Improvement 3: Column names in schema rules" do
+    let(:schema_context) do
+      {
+        app_name: "TestApp", rails_version: "8.0", ruby_version: "3.4",
+        schema: {
+          adapter: "postgresql", total_tables: 2,
+          tables: {
+            "posts" => {
+              columns: [
+                { name: "id", type: "bigint" },
+                { name: "title", type: "string" },
+                { name: "body", type: "text" },
+                { name: "user_id", type: "bigint" },
+                { name: "type", type: "string" },
+                { name: "deleted_at", type: "datetime" },
+                { name: "created_at", type: "datetime" },
+                { name: "updated_at", type: "datetime" }
+              ],
+              primary_key: "id"
+            },
+            "users" => {
+              columns: [
+                { name: "id", type: "bigint" },
+                { name: "email", type: "string" },
+                { name: "name", type: "string" },
+                { name: "created_at", type: "datetime" },
+                { name: "updated_at", type: "datetime" }
+              ],
+              primary_key: "id"
+            }
+          }
+        },
+        models: {}, routes: { total_routes: 0 }, gems: {}, conventions: {},
+        view_templates: { ui_patterns: {} }
+      }
+    end
+
     it "includes column names in Claude schema rules" do
-      context = RailsAiContext.introspect
       Dir.mktmpdir do |dir|
-        result = RailsAiContext::Serializers::ClaudeRulesSerializer.new(context).call(dir)
-        schema_file = File.join(dir, ".claude", "rules", "rails-schema.md")
-        content = File.read(schema_file)
-        # Should have column names, not just counts
+        RailsAiContext::Serializers::ClaudeRulesSerializer.new(schema_context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-schema.md"))
         expect(content).to include("title")
         expect(content).to include("body")
+        expect(content).to include("email")
       end
     end
 
     it "excludes id, timestamps, and foreign keys from column list" do
-      context = RailsAiContext.introspect
       Dir.mktmpdir do |dir|
-        RailsAiContext::Serializers::ClaudeRulesSerializer.new(context).call(dir)
+        RailsAiContext::Serializers::ClaudeRulesSerializer.new(schema_context).call(dir)
         content = File.read(File.join(dir, ".claude", "rules", "rails-schema.md"))
-        # Should not list these
         lines = content.lines.select { |l| l.start_with?("- ") }
         lines.each do |line|
           next unless line.include?("—")
           cols_part = line.split("—").last
           expect(cols_part).not_to include("created_at")
           expect(cols_part).not_to include("updated_at")
+          expect(cols_part).not_to include("user_id")
         end
+      end
+    end
+
+    it "keeps polymorphic type, STI type, and soft-delete columns" do
+      Dir.mktmpdir do |dir|
+        RailsAiContext::Serializers::ClaudeRulesSerializer.new(schema_context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-schema.md"))
+        posts_line = content.lines.find { |l| l.include?("posts") }
+        expect(posts_line).to include("type")
+        expect(posts_line).to include("deleted_at")
       end
     end
   end
