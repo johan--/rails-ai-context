@@ -33,12 +33,12 @@ module RailsAiContext
 
         # Specific model tests
         if model
-          return text_response(find_test_file(model, :model))
+          return text_response(find_test_file(model, :model, detail))
         end
 
         # Specific controller tests
         if controller
-          return text_response(find_test_file(controller, :controller))
+          return text_response(find_test_file(controller, :controller, detail))
         end
 
         case detail
@@ -121,7 +121,7 @@ module RailsAiContext
 
       MAX_TEST_FILE_SIZE = 500_000 # 500KB safety limit
 
-      private_class_method def self.find_test_file(name, type)
+      private_class_method def self.find_test_file(name, type, detail = "full")
         snake = name.to_s.underscore.sub(/_controller$/, "")
         candidates = case type
         when :model
@@ -150,6 +150,19 @@ module RailsAiContext
           end
           next if File.size(path) > MAX_TEST_FILE_SIZE
           content = File.read(path)
+
+          # Summary/standard: return just test names (saves 2000+ tokens vs full source)
+          if detail == "summary" || detail == "standard"
+            test_names = content.each_line.filter_map do |line|
+              if line.match?(/^\s*(test|it|describe|context|specify)\s+["']/)
+                "- #{line.strip}"
+              elsif line.match?(/^\s*def\s+test_/)
+                "- #{line.strip}"
+              end
+            end
+            return "# #{rel} (#{test_names.size} tests)\n\n#{test_names.join("\n")}"
+          end
+
           return "# #{rel}\n\n```ruby\n#{content}\n```"
         end
 

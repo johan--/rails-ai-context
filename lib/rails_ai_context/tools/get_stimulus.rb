@@ -41,27 +41,44 @@ module RailsAiContext
 
         case detail
         when "summary"
+          sorted = controllers.sort_by { |c| c[:name]&.to_s || "" }
+          active = sorted.select { |c| (c[:targets] || []).any? || (c[:actions] || []).any? }
+          empty = sorted.reject { |c| (c[:targets] || []).any? || (c[:actions] || []).any? }
+
           lines = [ "# Stimulus Controllers (#{controllers.size})", "" ]
-          controllers.sort_by { |c| c[:name]&.to_s || "" }.each do |ctrl|
+          active.each do |ctrl|
             targets = (ctrl[:targets] || []).size
             actions = (ctrl[:actions] || []).size
             lines << "- **#{ctrl[:name]}** — #{targets} targets, #{actions} actions"
+          end
+          if empty.any?
+            names = empty.map { |c| c[:name] }.join(", ")
+            lines << "- _#{names}_ (lifecycle only)"
           end
           lines << "" << "_Use `controller:\"name\"` for full detail._"
           text_response(lines.join("\n"))
 
         when "standard"
+          sorted = controllers.sort_by { |c| c[:name]&.to_s || "" }
+          active = sorted.select { |c| (c[:targets] || []).any? || (c[:actions] || []).any? }
+          empty = sorted.reject { |c| (c[:targets] || []).any? || (c[:actions] || []).any? }
+
           lines = [ "# Stimulus Controllers (#{controllers.size})", "" ]
-          controllers.sort_by { |c| c[:name]&.to_s || "" }.each do |ctrl|
+          active.each do |ctrl|
             lines << "## #{ctrl[:name]}"
             lines << "- Targets: #{(ctrl[:targets] || []).join(', ')}" if ctrl[:targets]&.any?
             lines << "- Actions: #{(ctrl[:actions] || []).join(', ')}" if ctrl[:actions]&.any?
             lines << ""
           end
+          if empty.any?
+            names = empty.map { |c| c[:name] }.join(", ")
+            lines << "_Lifecycle only (no targets/actions): #{names}_"
+          end
           text_response(lines.join("\n"))
 
         when "full"
           lines = [ "# Stimulus Controllers (#{controllers.size})", "" ]
+          lines << "_HTML naming: `data-controller=\"my-name\"` (dashes in HTML, underscores in filenames)_" << ""
           controllers.sort_by { |c| c[:name]&.to_s || "" }.each do |ctrl|
             lines << format_controller_full(ctrl) << ""
           end
@@ -80,8 +97,6 @@ module RailsAiContext
         lines << "- **Outlets:** #{ctrl[:outlets].join(', ')}" if ctrl[:outlets]&.any?
         lines << "- **Classes:** #{ctrl[:classes].join(', ')}" if ctrl[:classes]&.any?
         lines << "- **File:** #{ctrl[:file]}" if ctrl[:file]
-        html_name = ctrl[:name]&.tr("_", "-")
-        lines << "" << "_HTML: `data-controller=\"#{html_name}\"`_" if html_name
         lines.join("\n")
       end
     end

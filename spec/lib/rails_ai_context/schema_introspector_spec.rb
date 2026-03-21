@@ -154,6 +154,46 @@ RSpec.describe RailsAiContext::Introspectors::SchemaIntrospector do
       end
     end
 
+    context "with t.index format inside create_table" do
+      before do
+        allow(introspector).to receive(:active_record_connected?).and_return(false)
+
+        db_dir = File.join(fixture_path, "db")
+        FileUtils.mkdir_p(db_dir)
+        File.write(File.join(db_dir, "schema.rb"), <<~RUBY)
+          ActiveRecord::Schema[7.1].define(version: 2024_01_15_000000) do
+            create_table "brand_profiles" do |t|
+              t.integer "user_id"
+              t.boolean "is_default"
+              t.string "name"
+              t.index ["user_id", "is_default"], name: "index_brand_profiles_on_user_id_and_is_default"
+              t.index ["user_id"], name: "index_brand_profiles_on_user_id", unique: true
+            end
+          end
+        RUBY
+      end
+
+      after do
+        FileUtils.rm_rf(File.join(fixture_path, "db"))
+      end
+
+      it "parses t.index with composite columns" do
+        result = introspector.call
+        indexes = result[:tables]["brand_profiles"][:indexes]
+        composite_idx = indexes.find { |i| i[:name] == "index_brand_profiles_on_user_id_and_is_default" }
+        expect(composite_idx).not_to be_nil
+        expect(composite_idx[:columns]).to eq(%w[user_id is_default])
+      end
+
+      it "parses t.index with unique flag" do
+        result = introspector.call
+        indexes = result[:tables]["brand_profiles"][:indexes]
+        unique_idx = indexes.find { |i| i[:name] == "index_brand_profiles_on_user_id" }
+        expect(unique_idx).not_to be_nil
+        expect(unique_idx[:unique]).to eq(true)
+      end
+    end
+
     context "prefers schema.rb over structure.sql" do
       before do
         allow(introspector).to receive(:active_record_connected?).and_return(false)

@@ -80,14 +80,12 @@ module RailsAiContext
         lines = [ "# #{name}", "" ]
         lines << "**Table:** `#{data[:table_name]}`" if data[:table_name]
 
-        # File structure with line ranges
+        # File structure — compact one-line format
         structure = extract_model_structure(name)
         if structure
           lines << "**File:** `#{structure[:path]}` (#{structure[:total_lines]} lines)"
-          lines << "" << "## File Structure"
-          structure[:sections].each do |section|
-            lines << "- Lines #{section[:start]}-#{section[:end]}: #{section[:label]}"
-          end
+          map = structure[:sections].map { |s| "#{s[:label]}(#{s[:start]}-#{s[:end]})" }.join(" → ")
+          lines << "**Structure:** #{map}"
         end
 
         # Associations
@@ -103,12 +101,31 @@ module RailsAiContext
           end
         end
 
-        # Validations
+        # Validations — compress repeated inclusion lists
         if data[:validations]&.any?
           lines << "" << "## Validations"
+          # Track seen inclusion arrays to avoid repeating long lists
+          seen_inclusions = {}
           data[:validations].each do |v|
             attrs = v[:attributes].join(", ")
-            opts = v[:options]&.any? ? " (#{v[:options].map { |k, val| "#{k}: #{val}" }.join(', ')})" : ""
+            if v[:options]&.any?
+              compressed_opts = v[:options].map do |k, val|
+                if k.to_s == "in" && val.is_a?(Array) && val.size > 3
+                  key = val.sort.join(",")
+                  if seen_inclusions[key]
+                    "#{k}: (same as #{seen_inclusions[key]})"
+                  else
+                    seen_inclusions[key] = attrs
+                    "#{k}: #{val}"
+                  end
+                else
+                  "#{k}: #{val}"
+                end
+              end
+              opts = " (#{compressed_opts.join(', ')})"
+            else
+              opts = ""
+            end
             lines << "- `#{v[:kind]}` on #{attrs}#{opts}"
           end
         end
@@ -135,10 +152,13 @@ module RailsAiContext
           end
         end
 
-        # Concerns — filter out internal Rails modules
+        # Concerns — filter out framework/gem internal modules
         if data[:concerns]&.any?
           app_concerns = data[:concerns].reject do |c|
-            c.match?(/\A(ActiveRecord|ActiveModel|ActiveSupport|ActionText|ActionMailbox|ActiveStorage|GeneratedAssociationMethods|Kernel|JSON|PP|Marshal|MessagePack|GeneratedRelationMethods)/)
+            c.include?("::Generated") ||
+              c.match?(/\A(ActiveRecord|ActiveModel|ActiveSupport|ActionText|ActionMailbox|ActiveStorage|ActionDispatch|ActionController|ActionView|AbstractController)/) ||
+              c.match?(/\A(Devise::Models|Devise::Orm|Bullet::|Turbo::|GlobalID::|Rolify::)/) ||
+              %w[Kernel JSON PP Marshal MessagePack].any? { |mod| c == mod || c.start_with?("#{mod}::") }
           end
           if app_concerns.any?
             lines << "" << "## Concerns"
@@ -153,7 +173,16 @@ module RailsAiContext
           if signatures&.any?
             signatures.first(15).each { |s| lines << "- `#{s}`" }
           else
-            lines << data[:instance_methods].first(15).map { |m| "- `#{m}`" }.join("\n")
+            # Filter out association-generated methods (getters, setters, build_, create_)
+            assoc_names = (data[:associations] || []).flat_map do |a|
+              n = a[:name].to_s
+              [ n, "#{n}=", "build_#{n}", "create_#{n}", "reload_#{n}", "reset_#{n}",
+               "#{n}_ids", "#{n}_ids=", "#{n.singularize}_ids", "#{n.singularize}_ids=" ]
+            end
+            filtered = data[:instance_methods].reject { |m| assoc_names.include?(m) || m.end_with?("=") }
+            if filtered.any?
+              lines << filtered.first(15).map { |m| "- `#{m}`" }.join("\n")
+            end
           end
         end
 

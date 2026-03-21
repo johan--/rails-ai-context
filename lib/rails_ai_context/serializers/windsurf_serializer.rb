@@ -76,8 +76,9 @@ module RailsAiContext
         if conv.is_a?(Hash) && !conv[:error]
           arch = conv[:architecture] || []
           if arch.any?
+            arch_labels = RailsAiContext::Tools::GetConventions::ARCH_LABELS rescue {}
             lines << "# Architecture"
-            arch.first(5).each { |p| lines << "- #{p}" }
+            arch.first(5).each { |p| lines << "- #{arch_labels[p] || p}" }
           end
         end
 
@@ -111,7 +112,7 @@ module RailsAiContext
           app_ctrl = File.join(root, "app", "controllers", "application_controller.rb")
           if File.exist?(app_ctrl)
             source = File.read(app_ctrl)
-            before_actions = source.scan(/before_action\s+:(\w+)/).flatten
+            before_actions = source.scan(/before_action\s+:([\w!?]+)/).flatten
             lines << "Global before_actions: #{before_actions.join(', ')}" if before_actions.any?
           end
         rescue; end

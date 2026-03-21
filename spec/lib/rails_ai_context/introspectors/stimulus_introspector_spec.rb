@@ -75,6 +75,39 @@ RSpec.describe RailsAiContext::Introspectors::StimulusIntrospector do
       end
     end
 
+    context "with complex nested values on a single line" do
+      let(:controllers_dir) { File.join(Rails.root, "app/javascript/controllers") }
+
+      before do
+        FileUtils.mkdir_p(controllers_dir)
+        File.write(File.join(controllers_dir, "tabs_controller.js"), <<~JS)
+          import { Controller } from "@hotwired/stimulus"
+
+          export default class extends Controller {
+            static values = { active: { type: String, default: "overview" }, count: Number, visible: { type: Boolean, default: true } }
+
+            switch(event) {
+              this.activeValue = event.target.dataset.tab
+            }
+          }
+        JS
+      end
+
+      after do
+        FileUtils.rm_rf(File.join(Rails.root, "app/javascript"))
+      end
+
+      it "extracts complex values with defaults from single-line definition" do
+        result = introspector.call
+        values = result[:controllers].first[:values]
+        expect(values["active"]).to include("String")
+        expect(values["active"]).to include("overview")
+        expect(values["count"]).to eq("Number")
+        expect(values["visible"]).to include("Boolean")
+        expect(values["visible"]).to include("true")
+      end
+    end
+
     context "with a controller containing async methods and control flow" do
       let(:controllers_dir) { File.join(Rails.root, "app/javascript/controllers") }
 

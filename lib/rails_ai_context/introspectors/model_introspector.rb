@@ -29,7 +29,16 @@ module RailsAiContext
       private
 
       def eager_load_models!
-        Rails.application.eager_load! unless Rails.application.config.eager_load
+        return if Rails.application.config.eager_load
+
+        # Use targeted eager_load_dir to pick up newly created model files
+        models_path = File.join(app.root, "app", "models")
+        if defined?(Zeitwerk) && Dir.exist?(models_path) &&
+           Rails.autoloaders.respond_to?(:main) && Rails.autoloaders.main.respond_to?(:eager_load_dir)
+          Rails.autoloaders.main.eager_load_dir(models_path)
+        else
+          Rails.application.eager_load!
+        end
       rescue
         # In some environments (CI, Claude Code) eager_load may partially fail
         nil
@@ -140,9 +149,18 @@ module RailsAiContext
       def extract_concerns(model)
         model.ancestors
           .select { |mod| mod.is_a?(Module) && !mod.is_a?(Class) }
-          .reject { |mod| mod.name&.start_with?("ActiveRecord", "ActiveModel", "ActiveSupport") }
+          .reject { |mod| framework_concern?(mod.name) }
           .map(&:name)
           .compact
+      end
+
+      def framework_concern?(name)
+        return true if name.nil?
+        return true if name.include?("::Generated")
+        return true if name.match?(/\A(ActiveRecord|ActiveModel|ActiveSupport|ActionText|ActionMailbox|ActiveStorage|ActionDispatch|ActionController|ActionView|AbstractController)/)
+        return true if name.match?(/\A(Devise::Models|Devise::Orm|Bullet::|Turbo::|GlobalID::|Rolify::)/)
+        return true if %w[Kernel JSON PP Marshal MessagePack].include?(name)
+        false
       end
 
       def extract_public_class_methods(model)
@@ -154,11 +172,34 @@ module RailsAiContext
       end
 
       def extract_public_instance_methods(model)
+        generated = generated_association_methods(model)
+
         (model.instance_methods - ActiveRecord::Base.instance_methods - Object.instance_methods)
-          .reject { |m| m.to_s.start_with?("_", "autosave", "validate_associated") }
+          .reject { |m|
+            ms = m.to_s
+            ms.start_with?("_", "autosave", "validate_associated") || generated.include?(ms)
+          }
           .sort
           .first(30)
           .map(&:to_s)
+      end
+
+      # Build list of AR-generated association helper method names to exclude
+      def generated_association_methods(model)
+        methods = []
+        model.reflect_on_all_associations.each do |assoc|
+          name = assoc.name.to_s
+          singular = name.singularize
+          methods.concat(%W[
+            build_#{name} create_#{name} create_#{name}!
+            reload_#{name} reset_#{name}
+            #{name}_changed? #{name}_previously_changed?
+            #{singular}_ids #{singular}_ids=
+          ])
+        end
+        methods
+      rescue
+        []
       end
 
       def extract_source_macros(model)

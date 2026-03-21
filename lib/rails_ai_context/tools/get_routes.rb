@@ -36,6 +36,11 @@ module RailsAiContext
         action_mailbox/ active_storage/ rails/ conductor/
       ].freeze
 
+      # Framework routes that add noise to summary listings
+      FRAMEWORK_PREFIXES = %w[
+        devise/ turbo/
+      ].freeze
+
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
 
       def self.call(controller: nil, detail: "standard", limit: nil, offset: 0, app_only: true, server_context: nil)
@@ -58,14 +63,49 @@ module RailsAiContext
           by_controller = filtered
         end
 
+        # Combine PUT/PATCH duplicates (Rails generates both for update routes)
+        by_controller = by_controller.transform_values { |actions| dedupe_put_patch(actions) }
+
         case detail
         when "summary"
+          # Separate app routes from framework routes for cleaner output
+          app_routes = controller ? by_controller : by_controller.reject { |k, _| FRAMEWORK_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
+          framework_routes = controller ? {} : by_controller.select { |k, _| FRAMEWORK_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
+
           lines = [ "# Routes Summary (#{routes[:total_routes]} total)", "" ]
-          by_controller.keys.sort.each do |ctrl|
-            actions = by_controller[ctrl]
-            verbs = actions.map { |r| r[:verb] }.tally.map { |v, c| "#{c} #{v}" }.join(", ")
-            lines << "- **#{ctrl}** — #{actions.size} routes (#{verbs})"
+
+          # Group sibling routes with identical verb patterns (e.g., bonus/*)
+          grouped = app_routes.keys.sort.group_by do |ctrl|
+            actions = app_routes[ctrl]
+            namespace = ctrl.include?("/") ? ctrl.split("/").first : nil
+            verbs_sig = actions.map { |r| r[:verb] }.sort.join(",")
+            count_sig = actions.size
+            namespace && app_routes.count { |k, v| k.start_with?("#{namespace}/") && v.size == count_sig && v.map { |r| r[:verb] }.sort.join(",") == verbs_sig } > 2 ? "#{namespace}/*|#{count_sig}|#{verbs_sig}" : ctrl
           end
+
+          grouped.each do |_key, ctrls|
+            if ctrls.size > 2
+              namespace = ctrls.first.split("/").first
+              actions = app_routes[ctrls.first]
+              verbs = actions.map { |r| r[:verb] }.tally.map { |v, c| "#{c} #{v}" }.join(", ")
+              short_names = ctrls.map { |c| c.split("/").last }
+              lines << "- **#{namespace}/*** (#{short_names.join(', ')}) — #{actions.size} routes each (#{verbs})"
+            else
+              ctrls.each do |ctrl|
+                actions = app_routes[ctrl]
+                verbs = actions.map { |r| r[:verb] }.tally.map { |v, c| "#{c} #{v}" }.join(", ")
+                lines << "- **#{ctrl}** — #{actions.size} routes (#{verbs})"
+              end
+            end
+          end
+
+          # Show framework routes as a compact summary
+          if framework_routes.any?
+            total_fw = framework_routes.values.sum(&:size)
+            fw_names = framework_routes.keys.map { |k| k.split("/").first }.uniq.join(", ")
+            lines << "- _#{fw_names} framework routes: #{total_fw} total_"
+          end
+
           if routes[:api_namespaces]&.any?
             lines << "" << "API namespaces: #{routes[:api_namespaces].join(', ')}"
           end
@@ -74,24 +114,67 @@ module RailsAiContext
 
         when "standard"
           limit ||= 100
+          # Separate app vs framework routes (unless user filtered by controller)
+          app_routes = controller ? by_controller : by_controller.reject { |k, _| FRAMEWORK_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
+          framework_routes = controller ? {} : by_controller.select { |k, _| FRAMEWORK_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
+
           lines = [ "# Routes (#{routes[:total_routes]} total)", "" ]
           count = 0
-          by_controller.sort.each do |ctrl, actions|
-            next if count >= offset + limit
-            ctrl_lines = []
-            actions.each do |r|
-              count += 1
-              next if count <= offset
-              break if count > offset + limit
-              name_part = r[:name] ? " `#{r[:name]}`" : ""
-              ctrl_lines << "- `#{r[:verb]}` `#{r[:path]}` → #{r[:action]}#{name_part}"
-            end
-            if ctrl_lines.any?
-              lines << "## #{ctrl}"
-              lines.concat(ctrl_lines)
-              lines << ""
+
+          # Group identical sibling route sets (e.g. bonus/*)
+          grouped = app_routes.sort.group_by do |ctrl, actions|
+            ns = ctrl.include?("/") ? ctrl.split("/").first : nil
+            if ns
+              sibling_count = app_routes.count { |k, v| k.start_with?("#{ns}/") && v.size == actions.size && v.map { |r| "#{r[:verb]}:#{r[:action]}" }.sort == actions.map { |r| "#{r[:verb]}:#{r[:action]}" }.sort }
+              sibling_count > 2 ? "#{ns}/*" : ctrl
+            else
+              ctrl
             end
           end
+
+          grouped.each do |key, ctrl_groups|
+            if key.end_with?("/*") && ctrl_groups.size > 2
+              # Show one representative with all sibling names
+              ns = key.sub("/*", "")
+              names = ctrl_groups.map { |c, _| c.split("/").last }
+              _repr_ctrl, repr_actions = ctrl_groups.first
+              lines << "## #{ns}/* (#{names.join(', ')})"
+              repr_actions.each do |r|
+                count += 1
+                next if count <= offset
+                break if count > offset + limit
+                # Generalize paths: replace specific resource name with *
+                path = r[:path].sub(%r{/#{ns}/\w+}, "/#{ns}/*")
+                name_part = r[:name] ? " `#{r[:name].sub(/\w+$/, '*')}`" : ""
+                lines << "- `#{r[:verb]}` `#{path}` → #{r[:action]}#{name_part}"
+              end
+              lines << ""
+            else
+              ctrl_groups.each do |ctrl, actions|
+                next if count >= offset + limit
+                ctrl_lines = []
+                actions.each do |r|
+                  count += 1
+                  next if count <= offset
+                  break if count > offset + limit
+                  name_part = r[:name] ? " `#{r[:name]}`" : ""
+                  ctrl_lines << "- `#{r[:verb]}` `#{r[:path]}` → #{r[:action]}#{name_part}"
+                end
+                if ctrl_lines.any?
+                  lines << "## #{ctrl}"
+                  lines.concat(ctrl_lines)
+                  lines << ""
+                end
+              end
+            end
+          end
+
+          if framework_routes.any?
+            total_fw = framework_routes.values.sum(&:size)
+            fw_names = framework_routes.keys.map { |k| k.split("/").first }.uniq.join(", ")
+            lines << "_#{fw_names} framework routes: #{total_fw} total (use `controller:\"devise/sessions\"` to see details)_"
+          end
+
           lines << "_Use `detail:\"summary\"` for overview, or `detail:\"full\"` for route names._" if routes[:total_routes] > limit
           text_response(lines.join("\n"))
 
@@ -117,6 +200,18 @@ module RailsAiContext
         else
           text_response("Unknown detail level: #{detail}. Use summary, standard, or full.")
         end
+      end
+      private_class_method def self.dedupe_put_patch(actions)
+        deduped = []
+        actions.each do |r|
+          existing = deduped.find { |d| d[:path] == r[:path] && d[:action] == r[:action] }
+          if existing && %w[PUT PATCH].include?(r[:verb]) && %w[PUT PATCH].include?(existing[:verb])
+            existing[:verb] = "PATCH|PUT"
+          else
+            deduped << r.dup
+          end
+        end
+        deduped
       end
     end
   end

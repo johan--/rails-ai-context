@@ -42,54 +42,61 @@ module RailsAiContext
           return read_view_file(path)
         end
 
-        # Filter by controller
+        # Filter by controller (also checks partials for directories like "shared/")
         if controller
-          filtered = templates.select { |k, _| k.downcase.start_with?(controller.downcase + "/") }
-          return text_response("No views for '#{controller}'. Controllers with views: #{templates.keys.map { |k| k.split('/').first }.uniq.sort.join(', ')}") if filtered.empty?
-          templates = filtered
+          ctrl_lower = controller.downcase
+          filtered_templates = templates.select { |k, _| k.downcase.start_with?(ctrl_lower + "/") }
+          filtered_partials = partials.select { |k, _| k.downcase.start_with?(ctrl_lower + "/") }
+
+          if filtered_templates.empty? && filtered_partials.empty?
+            all_dirs = (templates.keys + partials.keys).map { |k| k.split("/").first }.uniq.sort
+            return text_response("No views for '#{controller}'. Directories with views: #{all_dirs.join(', ')}")
+          end
+
+          templates = filtered_templates
+          partials = filtered_partials
         end
 
         case detail
         when "summary"
+          all_dirs = (templates.keys + partials.keys).map { |k| k.split("/").first }.uniq.sort
           lines = [ "# Views (#{templates.size} templates, #{partials.size} partials)", "" ]
-          templates.keys.map { |k| k.split("/").first }.uniq.sort.each do |ctrl|
+          all_dirs.each do |ctrl|
             ctrl_templates = templates.select { |k, _| k.start_with?("#{ctrl}/") }
-            lines << "## #{ctrl}/ (#{ctrl_templates.size} files)"
+            ctrl_partials = partials.select { |k, _| k.start_with?("#{ctrl}/") }
+            file_count = ctrl_templates.size + ctrl_partials.size
+            # Skip redundant section header when filtered to a single controller
+            lines << "## #{ctrl}/ (#{file_count} files)" unless controller && all_dirs.size == 1
             ctrl_templates.sort.each do |name, meta|
               parts = meta[:partials]&.any? ? " renders: #{meta[:partials].join(', ')}" : ""
               stim = meta[:stimulus]&.any? ? " stimulus: #{meta[:stimulus].join(', ')}" : ""
               lines << "- #{File.basename(name)} (#{meta[:lines]} lines)#{parts}#{stim}"
+            end
+            ctrl_partials.sort.each do |name, meta|
+              lines << "- #{File.basename(name)} (#{meta[:lines]} lines)"
             end
             lines << ""
           end
           text_response(lines.join("\n"))
 
         when "standard"
-          all_partials = data[:partials] || {}
-          lines = [ "# Views (#{templates.size} templates, #{all_partials.size} partials)", "" ]
-          templates.keys.map { |k| k.split("/").first }.uniq.sort.each do |ctrl|
+          all_dirs = (templates.keys + partials.keys).map { |k| k.split("/").first }.uniq.sort
+          lines = [ "# Views (#{templates.size} templates, #{partials.size} partials)", "" ]
+          all_dirs.each do |ctrl|
             ctrl_templates = templates.select { |k, _| k.start_with?("#{ctrl}/") }
-            lines << "## #{ctrl}/"
+            ctrl_partials = partials.select { |k, _| k.start_with?("#{ctrl}/") }
+            next if ctrl_templates.empty? && ctrl_partials.empty?
+
+            lines << "## #{ctrl}/" unless controller && all_dirs.size == 1
             ctrl_templates.sort.each do |name, meta|
               parts = meta[:partials]&.any? ? " renders: #{meta[:partials].join(', ')}" : ""
               stim = meta[:stimulus]&.any? ? " stimulus: #{meta[:stimulus].join(', ')}" : ""
               lines << "- #{File.basename(name)} (#{meta[:lines]} lines)#{parts}#{stim}"
             end
-            # Show partials for this controller with field/helper info
-            ctrl_partials = all_partials.select { |k, _| k.start_with?("#{ctrl}/") }
             ctrl_partials.sort.each do |name, meta|
               fields = meta[:fields]&.any? ? " fields: #{meta[:fields].join(', ')}" : ""
               helpers = meta[:helpers]&.any? ? " helpers: #{meta[:helpers].join(', ')}" : ""
               lines << "- #{File.basename(name)} (#{meta[:lines]} lines)#{fields}#{helpers}"
-            end
-            lines << ""
-          end
-          # Show shared partials
-          shared = all_partials.select { |k, _| k.start_with?("shared/") }
-          if shared.any?
-            lines << "## shared/"
-            shared.sort.each do |name, meta|
-              lines << "- #{File.basename(name)} (#{meta[:lines]} lines)"
             end
             lines << ""
           end
@@ -98,13 +105,30 @@ module RailsAiContext
         when "full"
           if controller
             lines = [ "# Views: #{controller}/", "" ]
+            # Combine all content first for cross-template Tailwind compression
+            all_content = []
             templates.sort.each do |name, _meta|
-              content = read_view_content(name)
-              lines << "## #{name}" << "```erb" << content << "```" << ""
+              all_content << [ name, strip_svg(read_view_content(name)) ]
             end
+            partials.sort.each do |name, _meta|
+              all_content << [ name, strip_svg(read_view_content(name)) ]
+            end
+            # Compress repeated Tailwind classes across all templates
+            combined = all_content.map { |name, c| "## #{name}\n```erb\n#{c}\n```\n" }.join("\n")
+            combined = compress_tailwind(combined)
+            lines << combined
             text_response(lines.join("\n"))
           else
-            text_response("Use `controller:\"name\"` with `detail:\"full\"` to get template content, or `path:\"cooks/index.html.erb\"` for a specific file.")
+            # List available controllers when no controller specified
+            all_dirs = (templates.keys + partials.keys).map { |k| k.split("/").first }.uniq.sort
+            lines = [ "# Views — Full Detail", "", "_Specify a controller to see template content:_", "" ]
+            all_dirs.each do |ctrl|
+              count = templates.count { |k, _| k.start_with?("#{ctrl}/") } +
+                      partials.count { |k, _| k.start_with?("#{ctrl}/") }
+              lines << "- `controller:\"#{ctrl}\"` (#{count} files)"
+            end
+            lines << "" << "_Or use `path:\"controller/action.html.erb\"` for a specific file._"
+            text_response(lines.join("\n"))
           end
         else
           text_response("Unknown detail level: #{detail}. Use summary, standard, or full.")
@@ -132,8 +156,41 @@ module RailsAiContext
           return text_response("File too large: #{path} (#{File.size(full_path)} bytes)")
         end
 
-        content = File.read(full_path)
+        content = compress_tailwind(strip_svg(File.read(full_path)))
         text_response("# #{path}\n\n```erb\n#{content}\n```")
+      end
+
+      # Strip inline SVG blocks to save tokens — they're visual noise for code understanding.
+      # Replaces <svg ...>...</svg> with a compact placeholder.
+      private_class_method def self.strip_svg(content)
+        content.gsub(/<svg\b[^>]*>.*?<\/svg>/m, "<!-- svg icon -->")
+      end
+
+      # Compress repeated long Tailwind class strings to save tokens.
+      # Replaces duplicate class="..." with a CSS variable reference after first occurrence.
+      private_class_method def self.compress_tailwind(content)
+        class_counts = Hash.new(0)
+        # Count class strings longer than 60 chars
+        content.scan(/class="([^"]{60,})"/).each { |m| class_counts[m[0]] += 1 }
+
+        # Only compress classes that appear 3+ times
+        repeated = class_counts.select { |_, count| count >= 3 }
+        return content if repeated.empty?
+
+        result = content.dup
+        repeated.each_with_index do |(cls, _count), idx|
+          label = "/* .cls-#{idx + 1} */"
+          first = true
+          result.gsub!("class=\"#{cls}\"") do
+            if first
+              first = false
+              "class=\"#{cls}\" #{label}"
+            else
+              "class=\"...\" #{label}"
+            end
+          end
+        end
+        result
       end
 
       private_class_method def self.read_view_content(relative_path)

@@ -16,11 +16,13 @@ module RailsAiContext
           cache_store: detect_cache_store,
           session_store: detect_session_store,
           timezone: app.config.time_zone.to_s,
+          queue_adapter: detect_queue_adapter,
+          mailer: detect_mailer_settings,
           middleware_stack: extract_middleware,
           initializers: extract_initializers,
           credentials_keys: extract_credentials_keys,
           current_attributes: detect_current_attributes
-        }
+        }.compact
       rescue => e
         { error: e.message }
       end
@@ -44,6 +46,40 @@ module RailsAiContext
 
       def detect_session_store
         app.config.session_store&.name rescue "unknown"
+      end
+
+      def detect_queue_adapter
+        adapter = app.config.active_job.queue_adapter
+        case adapter
+        when Symbol then adapter.to_s
+        when Class then adapter.name
+        else adapter.to_s
+        end
+      rescue
+        "unknown"
+      end
+
+      def detect_mailer_settings
+        mailer_config = app.config.action_mailer
+        settings = {}
+
+        if mailer_config.respond_to?(:delivery_method) && mailer_config.delivery_method
+          settings[:delivery_method] = mailer_config.delivery_method.to_s
+        end
+
+        if mailer_config.respond_to?(:default_options) && mailer_config.default_options.is_a?(Hash)
+          from = mailer_config.default_options[:from]
+          settings[:default_from] = from if from
+        end
+
+        if mailer_config.respond_to?(:default_url_options) && mailer_config.default_url_options.is_a?(Hash)
+          host = mailer_config.default_url_options[:host]
+          settings[:default_url_host] = host if host
+        end
+
+        settings.empty? ? nil : settings
+      rescue
+        nil
       end
 
       def extract_middleware

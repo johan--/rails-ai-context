@@ -343,15 +343,20 @@ module RailsAiContext
 
       def extract_model_fields(content)
         fields = []
-        content.scan(/(?:@?\w+)\.(\w+)/).each do |m|
+        # Only extract from @variable.field patterns (instance variable receivers)
+        content.scan(/@\w+\.(\w+)/).each do |m|
           field = m[0]
           next if field.length < 3 || field.length > 40
           next if field.match?(/\A[0-9a-f]+\z/)
-          next if field.match?(/\A[A-Z]/) # skip constant/class access
+          next if field.match?(/\A[A-Z]/)
           next if EXCLUDED_METHODS.include?(field)
           next if field.start_with?("to_", "html_")
           next if field.end_with?("?", "!")
           fields << field
+        end
+        # Also extract from form helper symbols: f.text_field :name, f.select :status
+        content.scan(/f\.\w+(?:_field|_area|_select)?\s+:(\w+)/).each do |m|
+          fields << m[0] if m[0].length >= 2
         end
         fields.uniq.first(15)
       end

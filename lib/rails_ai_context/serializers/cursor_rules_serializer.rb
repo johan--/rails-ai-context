@@ -83,7 +83,8 @@ module RailsAiContext
 
         conv = context[:conventions]
         if conv.is_a?(Hash) && !conv[:error]
-          (conv[:architecture] || []).first(5).each { |p| lines << "- #{p}" }
+          arch_labels = RailsAiContext::Tools::GetConventions::ARCH_LABELS rescue {}
+          (conv[:architecture] || []).first(5).each { |p| lines << "- #{arch_labels[p] || p}" }
         end
 
         # List service objects
@@ -116,7 +117,7 @@ module RailsAiContext
           app_ctrl = File.join(root, "app", "controllers", "application_controller.rb")
           if File.exist?(app_ctrl)
             source = File.read(app_ctrl)
-            before_actions = source.scan(/before_action\s+:(\w+)/).flatten
+            before_actions = source.scan(/before_action\s+:([\w!?]+)/).flatten
             lines << "" << "Global before_actions: #{before_actions.join(', ')}" if before_actions.any?
           end
         rescue; end

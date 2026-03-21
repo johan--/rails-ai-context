@@ -57,8 +57,10 @@ module RailsAiContext
       end
 
       def extract_columns(table)
+        schema_defaults = parse_schema_defaults_for_table(table)
+
         connection.columns(table).map do |col|
-          {
+          entry = {
             name: col.name,
             type: col.type.to_s,
             null: col.null,
@@ -67,7 +69,12 @@ module RailsAiContext
             precision: col.precision,
             scale: col.scale,
             comment: col.comment
-          }.compact
+          }
+          # Supplement with schema.rb default when live DB returns nil
+          if entry[:default].nil? && schema_defaults[col.name]
+            entry[:default] = schema_defaults[col.name]
+          end
+          entry.compact
         end
       end
 
@@ -95,6 +102,35 @@ module RailsAiContext
         end
       rescue
         [] # Some adapters don't support foreign_keys
+      end
+
+      # Parse default values from schema.rb for a specific table.
+      # Used to supplement live DB column data when the adapter returns nil defaults.
+      def parse_schema_defaults_for_table(table)
+        return {} unless File.exist?(schema_file_path)
+
+        content = File.read(schema_file_path)
+        defaults = {}
+        in_table = false
+
+        content.each_line do |line|
+          if line.match?(/create_table\s+"#{Regexp.escape(table)}"/)
+            in_table = true
+          elsif in_table && line.match?(/\A\s*end\b/)
+            break
+          elsif in_table
+            # Match column with a simple default value (skip proc defaults like -> { })
+            if (match = line.match(/t\.\w+\s+"(\w+)".*,\s*default:\s*("[^"]*"|\d+(?:\.\d+)?|true|false)/))
+              col_name = match[1]
+              raw = match[2]
+              defaults[col_name] = raw.start_with?('"') ? raw[1..-2] : raw
+            end
+          end
+        end
+
+        defaults
+      rescue
+        {}
       end
 
       def current_schema_version
@@ -138,6 +174,11 @@ module RailsAiContext
             tables[current_table] = { columns: [], indexes: [], foreign_keys: [] }
           elsif current_table && (match = line.match(/t\.(\w+)\s+"(\w+)"/))
             tables[current_table][:columns] << { name: match[2], type: match[1] }
+          elsif current_table && (match = line.match(/t\.index\s+\[([^\]]*)\]/))
+            cols = match[1].scan(/["'](\w+)["']/).flatten
+            unique = line.include?("unique: true")
+            idx_name = line.match(/name:\s*["']([^"']+)["']/)&.send(:[], 1)
+            tables[current_table][:indexes] << { name: idx_name, columns: cols, unique: unique }.compact if cols.any?
           elsif (match = line.match(/add_index\s+"(\w+)",\s+(.+)/))
             table_name = match[1]
             rest = match[2]

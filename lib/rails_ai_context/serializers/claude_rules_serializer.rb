@@ -83,7 +83,7 @@ module RailsAiContext
           app_ctrl_file = File.join(root, "app", "controllers", "application_controller.rb")
           if File.exist?(app_ctrl_file)
             source = File.read(app_ctrl_file)
-            before_actions = source.scan(/before_action\s+:(\w+)/).flatten
+            before_actions = source.scan(/before_action\s+:([\w!?]+)/).flatten
             if before_actions.any?
               lines << "" << "**Global before_actions:** #{before_actions.join(', ')}"
             end
@@ -197,12 +197,29 @@ module RailsAiContext
           scopes = data[:scopes] || []
           lines << "  scopes: #{scopes.join(', ')}" if scopes.any?
 
-          # Include app-specific instance methods (filter out Rails-generated ones)
+          # Include app-specific instance methods (filter out Rails/Devise-generated ones)
           generated_patterns = %w[build_ create_ reload_ reset_ _changed? _previously_changed?
                                   _ids _ids= _before_last_save _before_type_cast _came_from_user?
                                   _for_database _in_database _was]
+          # Filter out association getters (cooks, user, plan, etc.)
+          assoc_names = (data[:associations] || []).flat_map { |a| [ a[:name].to_s, "#{a[:name]}=" ] }
+          # Filter out Devise and other framework-generated methods
+          devise_methods = %w[active_for_authentication? after_database_authentication after_remembered
+                              authenticatable_salt inactive_message confirmation_required?
+                              send_confirmation_instructions password_required? email_required?
+                              will_save_change_to_email? clean_up_passwords current_password
+                              destroy_with_password devise_mailer devise_modules devise_scope
+                              send_devise_notification valid_password? update_with_password
+                              send_reset_password_instructions apply_to_attribute_or_variable
+                              allowed_gemini_models remember_me! forget_me!
+                              skip_confirmation! skip_reconfirmation!]
+          devise_patterns = %w[devise_ _password _authenticatable _confirmation _recoverable]
           methods = (data[:instance_methods] || []).reject { |m|
-            generated_patterns.any? { |p| m.include?(p) } || m.end_with?("=")
+            generated_patterns.any? { |p| m.include?(p) } ||
+              m.end_with?("=") ||
+              assoc_names.include?(m) ||
+              devise_methods.include?(m) ||
+              devise_patterns.any? { |p| m.include?(p) }
           }.first(10)
           lines << "  methods: #{methods.join(', ')}" if methods.any?
 
@@ -353,7 +370,8 @@ module RailsAiContext
           "",
           "**rails_get_test_info** — test framework, fixtures, factories, helpers",
           "- `rails_get_test_info(detail:\"full\")` — fixture names, factory names, helper setup",
-          "- `rails_get_test_info(model:\"Cook\")` — existing tests for a model",
+          "- `rails_get_test_info(model:\"Cook\")` — full test source for a model",
+          "- `rails_get_test_info(model:\"Cook\", detail:\"summary\")` — test names only (saves tokens)",
           "- `rails_get_test_info(controller:\"Cooks\")` — existing controller tests",
           "",
           "**rails_get_edit_context** — surgical edit helper with line numbers",

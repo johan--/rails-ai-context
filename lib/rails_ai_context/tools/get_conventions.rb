@@ -37,10 +37,17 @@ module RailsAiContext
           end
         end
 
-        # Config files
+        # Config files — only show non-obvious ones (skip files every Rails app has)
         if conventions[:config_files]&.any?
-          lines << "" << "## Config files present"
-          conventions[:config_files].each { |f| lines << "- `#{f}`" }
+          obvious = %w[
+            config/application.rb config/puma.rb config/locales/en.yml
+            Gemfile package.json Rakefile
+          ]
+          notable = conventions[:config_files].reject { |f| obvious.include?(f) }
+          if notable.any?
+            lines << "" << "## Notable config files"
+            notable.each { |f| lines << "- `#{f}`" }
+          end
         end
 
         text_response(lines.join("\n"))

@@ -65,9 +65,12 @@ module RailsAiContext
         arch = conv[:architecture] || []
         patterns = conv[:patterns] || []
 
+        arch_labels = RailsAiContext::Tools::GetConventions::ARCH_LABELS rescue {}
+        pattern_labels = RailsAiContext::Tools::GetConventions::PATTERN_LABELS rescue {}
+
         lines = [ "## Overview" ]
-        lines << "- **Architecture:** #{arch.join(', ')}" if arch.any?
-        lines << "- **Patterns:** #{patterns.join(', ')}" if patterns.any?
+        lines << "- **Architecture:** #{arch.map { |a| arch_labels[a] || a }.join(', ')}" if arch.any?
+        lines << "- **Patterns:** #{patterns.map { |p| pattern_labels[p] || p }.join(', ')}" if patterns.any?
         lines.join("\n")
       end
 

@@ -76,16 +76,27 @@ module RailsAiContext
           "#{(start_idx + i + 1).to_s.rjust(4)}  #{line.rstrip}"
         end.join("\n")
 
+        lang = case file
+        when /\.rb$/ then "ruby"
+        when /\.js$/ then "javascript"
+        when /\.erb$/ then "erb"
+        when /\.yml$/, /\.yaml$/ then "yaml"
+        else ""
+        end
+
         output = [ "# #{file} (lines #{start_idx + 1}-#{end_idx + 1} of #{source_lines.size})", "" ]
-        output << "```ruby"
+        output << "```#{lang}"
         output << context_code
         output << "```"
         output << ""
         output << "_Use the code between lines #{start_idx + 1}-#{end_idx + 1} as old_string for Edit._"
 
         if matches.size > 1
-          other = matches[1..4].map { |i| "line #{i + 1}" }.join(", ")
-          output << "_Also found '#{near}' at: #{other}_"
+          outside = matches[1..].select { |i| i < start_idx || i > end_idx }
+          if outside.any?
+            other = outside.first(4).map { |i| "line #{i + 1}" }.join(", ")
+            output << "_Also found '#{near}' at: #{other}_"
+          end
         end
 
         text_response(output.join("\n"))
@@ -110,11 +121,11 @@ module RailsAiContext
       end
 
       private_class_method def self.find_method_end(lines, from_idx)
-        depth = 0
-        lines[from_idx..].each_with_index do |line, i|
-          depth += line.scan(/\b(?:def|do|if|unless|case|begin|class|module)\b/).size
-          depth -= line.scan(/\bend\b/).size
-          return from_idx + i if depth <= 0
+        # Use indentation-based matching — the `end` for a `def` is always at the same indent level.
+        # This is much more reliable than regex depth counting which miscounts inline if/unless modifiers.
+        def_indent = lines[from_idx][/\A\s*/]&.length || 0
+        lines[(from_idx + 1)..].each_with_index do |line, i|
+          return from_idx + i + 1 if line.match?(/\A\s{#{def_indent}}end\b/)
         end
         nil
       end

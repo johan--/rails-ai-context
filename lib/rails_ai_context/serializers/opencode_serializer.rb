@@ -71,8 +71,9 @@ module RailsAiContext
 
         routes = context[:routes]
         if routes && !routes[:error]
-          ctrl_count = (routes[:by_controller] || {}).keys.size
-          lines << "- Routes: #{routes[:total_routes]} across #{ctrl_count} controllers"
+          internal = %w[action_mailbox/ active_storage/ rails/ conductor/ devise/ turbo/]
+          app_ctrls = (routes[:by_controller] || {}).keys.reject { |k| internal.any? { |p| k.downcase.start_with?(p) } }
+          lines << "- Routes: #{routes[:total_routes]} across #{app_ctrls.size} controllers"
         end
 
         auth = context[:auth]
@@ -117,7 +118,7 @@ module RailsAiContext
           data = models[name]
           assoc_count = (data[:associations] || []).size
           val_count = (data[:validations] || []).size
-          top_assocs = (data[:associations] || []).first(3).map { |a| "#{a[:type]} :#{a[:name]}" }.join(", ")
+          top_assocs = (data[:associations] || []).map { |a| "#{a[:type]} :#{a[:name]}" }.join(", ")
           line = "- **#{name}**"
           line += " (#{assoc_count}a, #{val_count}v)" if assoc_count > 0 || val_count > 0
           line += " — #{top_assocs}" if top_assocs && !top_assocs.empty?
@@ -152,9 +153,12 @@ module RailsAiContext
         patterns = conv[:patterns] || []
         return [] if arch.empty? && patterns.empty?
 
+        arch_labels = RailsAiContext::Tools::GetConventions::ARCH_LABELS rescue {}
+        pattern_labels = RailsAiContext::Tools::GetConventions::PATTERN_LABELS rescue {}
+
         lines = [ "## Architecture" ]
-        arch.each { |p| lines << "- #{p}" }
-        patterns.first(8).each { |p| lines << "- #{p}" }
+        arch.each { |p| lines << "- #{arch_labels[p] || p}" }
+        patterns.first(8).each { |p| lines << "- #{pattern_labels[p] || p}" }
         lines << ""
         lines
       end
@@ -213,13 +217,24 @@ module RailsAiContext
       end
 
       def render_commands
+        test_cmd = detect_test_command
         [
           "## Commands",
           "- `bin/dev` — start dev server",
-          "- `bundle exec rspec` — run tests",
+          "- `#{test_cmd}` — run tests",
           "- `rails db:migrate` — run pending migrations",
           ""
         ]
+      end
+
+      def detect_test_command
+        tests = context[:tests]
+        framework = tests.is_a?(Hash) ? tests[:framework] : nil
+        case framework
+        when "rspec" then "bundle exec rspec"
+        when "minitest" then "rails test"
+        else "bundle exec rspec"
+        end
       end
 
       def render_footer
@@ -237,6 +252,16 @@ module RailsAiContext
     # Internal: full-mode OpenCode serializer (wraps MarkdownSerializer)
     class FullOpencodeSerializer < MarkdownSerializer
       private
+
+      def detect_test_command
+        tests = context[:tests]
+        framework = tests.is_a?(Hash) ? tests[:framework] : nil
+        case framework
+        when "rspec" then "bundle exec rspec"
+        when "minitest" then "rails test"
+        else "bundle exec rspec"
+        end
+      end
 
       def header
         <<~MD
@@ -260,7 +285,8 @@ module RailsAiContext
         rules << "- Use the database schema as the source of truth for column names and types"
         rules << "- Respect existing associations and validations when modifying models"
         rules << "- Match the project's architecture style (#{architecture_summary})" if architecture_summary
-        rules << "- Run `bundle exec rspec` after making changes to verify correctness"
+        test_cmd = detect_test_command
+        rules << "- Run `#{test_cmd}` after making changes to verify correctness"
         rules << ""
         rules << super
         rules.join("\n")

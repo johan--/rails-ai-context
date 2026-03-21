@@ -52,10 +52,26 @@ module RailsAiContext
       end
 
       def extract_values(content)
-        match = content.match(/static\s+values\s*=\s*\{(.*?)\}/m)
-        return {} unless match
+        start_match = content.match(/static\s+values\s*=\s*\{/)
+        return {} unless start_match
 
-        body = match[1]
+        # Use brace-depth counting to find the matching closing brace,
+        # handling nested objects like { active: { type: String, default: "overview" } }
+        start_pos = start_match.end(0)
+        depth = 1
+        pos = start_pos
+
+        while pos < content.length && depth > 0
+          case content[pos]
+          when "{" then depth += 1
+          when "}" then depth -= 1
+          end
+          pos += 1
+        end
+
+        return {} if depth != 0
+
+        body = content[start_pos...pos - 1]
         values = {}
 
         # Handle complex format: name: { type: Type, default: val }
@@ -66,7 +82,10 @@ module RailsAiContext
         end
 
         # Handle simple format: name: Type (single line or multi-line)
+        # Skip 'type' and 'default' — they are keywords inside complex value definitions,
+        # not actual Stimulus value names
         body.scan(/(\w+)\s*:\s*([A-Z]\w+)/).each do |name, type|
+          next if %w[type default].include?(name)
           values[name] ||= type
         end
 

@@ -4,8 +4,17 @@ module RailsAiContext
   module Introspectors
     # Discovers controllers and extracts filters, strong params,
     # respond_to formats, concerns, actions, and API detection.
+    # Uses source-file parsing (not just Ruby reflection) so that
+    # changes made mid-session are always visible.
     class ControllerIntrospector
       attr_reader :app
+
+      # Framework filters inherited from ActionController::Base — suppress to reduce noise
+      FRAMEWORK_FILTERS = %w[
+        verify_authenticity_token verify_same_origin_request
+        turbo_tracking_request_id handle_unverified_request
+        mark_for_same_origin_verification
+      ].freeze
 
       def initialize(app)
         @app = app
@@ -21,6 +30,12 @@ module RailsAiContext
           hash[ctrl.name] = { error: e.message }
         end
 
+        # Discover controllers from filesystem that may not be loaded as classes
+        discover_from_filesystem.each do |name, path|
+          next if result.key?(name)
+          result[name] = extract_details_from_source(path)
+        end
+
         { controllers: result }
       rescue => e
         { error: e.message }
@@ -29,7 +44,16 @@ module RailsAiContext
       private
 
       def eager_load_controllers!
-        Rails.application.eager_load! unless Rails.application.config.eager_load
+        return if Rails.application.config.eager_load
+
+        # Use targeted eager_load_dir to pick up newly created controller files
+        controllers_path = File.join(app.root, "app", "controllers")
+        if defined?(Zeitwerk) && Dir.exist?(controllers_path) &&
+           Rails.autoloaders.respond_to?(:main) && Rails.autoloaders.main.respond_to?(:eager_load_dir)
+          Rails.autoloaders.main.eager_load_dir(controllers_path)
+        else
+          Rails.application.eager_load!
+        end
       rescue
         nil
       end
@@ -46,14 +70,45 @@ module RailsAiContext
         end.uniq.sort_by(&:name)
       end
 
+      # Scan filesystem for controller files not yet loaded as classes
+      def discover_from_filesystem
+        controllers_dir = File.join(app.root, "app", "controllers")
+        return {} unless Dir.exist?(controllers_dir)
+
+        Dir.glob(File.join(controllers_dir, "**/*_controller.rb")).each_with_object({}) do |path, hash|
+          relative = path.sub("#{controllers_dir}/", "")
+          class_name = relative.sub(/\.rb\z/, "").split("/").map(&:camelize).join("::")
+          next if class_name == "ApplicationController"
+          next if class_name.start_with?("Rails::", "ActionMailbox::", "ActiveStorage::")
+          hash[class_name] = path
+        end
+      end
+
+      # Extract details purely from source file (for controllers not loaded as classes)
+      def extract_details_from_source(path)
+        source = File.read(path)
+        parent = source.match(/class\s+\S+\s*<\s*(\S+)/)&.send(:[], 1) || "Unknown"
+        {
+          parent_class: parent,
+          api_controller: parent.include?("API"),
+          actions: extract_actions_from_source(source),
+          filters: extract_filters_from_source(source),
+          concerns: extract_concerns_from_source(source),
+          strong_params: extract_strong_params(source),
+          respond_to_formats: extract_respond_to(source)
+        }.compact
+      rescue => e
+        { error: e.message }
+      end
+
       def extract_controller_details(ctrl)
         source = read_source(ctrl)
 
         {
           parent_class: ctrl.superclass.name,
           api_controller: api_controller?(ctrl),
-          actions: extract_actions(ctrl),
-          filters: extract_filters(ctrl),
+          actions: extract_actions(ctrl, source),
+          filters: extract_filters(ctrl, source),
           concerns: extract_concerns(ctrl),
           strong_params: extract_strong_params(source),
           respond_to_formats: extract_respond_to(source)
@@ -65,17 +120,51 @@ module RailsAiContext
         false
       end
 
-      def extract_actions(ctrl)
+      # Prefer source-based parsing for actions — always reflects current file state.
+      # Falls back to reflection for controllers without readable source files.
+      def extract_actions(ctrl, source = nil)
+        if source
+          actions = extract_actions_from_source(source)
+          return actions if actions.any?
+        end
         ctrl.action_methods.to_a.sort
       rescue
         []
       end
 
-      def extract_filters(ctrl)
+      def extract_actions_from_source(source)
+        in_private = false
+        actions = []
+
+        source.each_line do |line|
+          if line.match?(/\A\s*(private|protected)\s*$/)
+            in_private = true
+          elsif line.match?(/\A\s*public\s*$/)
+            in_private = false
+          end
+
+          next if in_private
+
+          if (match = line.match(/\A\s*def\s+(\w+[?!]?)/))
+            actions << match[1] unless match[1].start_with?("_")
+          end
+        end
+
+        actions.sort
+      end
+
+      # Prefer source-based parsing for filters — always reflects current file state.
+      # Falls back to reflection for controllers without readable source files.
+      def extract_filters(ctrl, source = nil)
+        if source
+          filters = extract_filters_from_source(source)
+          return filters if filters.any?
+        end
         return [] unless ctrl.respond_to?(:_process_action_callbacks)
 
         ctrl._process_action_callbacks.filter_map do |cb|
           next if cb.filter.is_a?(Proc) || cb.filter.to_s.start_with?("_")
+          next if FRAMEWORK_FILTERS.include?(cb.filter.to_s)
 
           filter = { name: cb.filter.to_s, kind: cb.kind.to_s }
           filter[:only] = cb.instance_variable_get(:@if)&.filter_map { |c| extract_action_condition(c) }&.flatten
@@ -86,6 +175,46 @@ module RailsAiContext
         end
       rescue
         []
+      end
+
+      def extract_filters_from_source(source)
+        filters = []
+        source.each_line do |line|
+          next unless (match = line.match(
+            /\A\s*(before_action|after_action|around_action|prepend_before_action|append_before_action)\s+:(\w+[?!]?)/
+          ))
+
+          kind = match[1].sub(/_action\z/, "").sub(/\A(?:prepend|append)_/, "")
+          filter = { name: match[2], kind: kind }
+
+          only = parse_action_constraint(line, "only")
+          except = parse_action_constraint(line, "except")
+          filter[:only] = only if only&.any?
+          filter[:except] = except if except&.any?
+          filters << filter
+        end
+        filters
+      end
+
+      def parse_action_constraint(line, key)
+        return nil unless line.include?("#{key}:")
+
+        # %i[...] or %w[...] format
+        if (match = line.match(/#{key}:\s*%[iwIW]\[([^\]]+)\]/))
+          return match[1].split(/\s+/)
+        end
+
+        # [...] format with symbols
+        if (match = line.match(/#{key}:\s*\[([^\]]+)\]/))
+          return match[1].scan(/:(\w+[?!]?)/).flatten
+        end
+
+        # Single symbol format
+        if (match = line.match(/#{key}:\s*:(\w+[?!]?)/))
+          return [ match[1] ]
+        end
+
+        nil
       end
 
       def extract_action_condition(condition)
@@ -102,6 +231,10 @@ module RailsAiContext
           .compact
       rescue
         []
+      end
+
+      def extract_concerns_from_source(source)
+        source.scan(/^\s*include\s+(\w+(?:::\w+)*)/).flatten
       end
 
       def extract_strong_params(source)

@@ -33,11 +33,15 @@ module RailsAiContext
 
         controllers = data[:controllers] || {}
 
-        # Specific controller — always full detail
+        # Filter out framework-internal controllers for listings/error messages
+        framework_controllers = %w[DeviseController Devise::OmniauthCallbacksController]
+        app_controller_names = controllers.keys.reject { |name| framework_controllers.include?(name) }.sort
+
+        # Specific controller — always full detail (searches ALL controllers including framework)
         if controller
           key = controllers.keys.find { |k| k.downcase == controller.downcase } || controller
           info = controllers[key]
-          return text_response("Controller '#{controller}' not found. Available: #{controllers.keys.sort.join(', ')}") unless info
+          return text_response("Controller '#{controller}' not found. Available: #{app_controller_names.join(', ')}") unless info
           return text_response("Error inspecting #{key}: #{info[:error]}") if info[:error]
 
           # Specific action — return source code
@@ -48,12 +52,14 @@ module RailsAiContext
           return text_response(format_controller(key, info))
         end
 
+        app_controllers = controllers.reject { |name, _| framework_controllers.include?(name) }
+
         # Listing mode
         case detail
         when "summary"
-          lines = [ "# Controllers (#{controllers.size})", "" ]
-          controllers.keys.sort.each do |name|
-            info = controllers[name]
+          lines = [ "# Controllers (#{app_controllers.size})", "" ]
+          app_controllers.keys.sort.each do |name|
+            info = app_controllers[name]
             action_count = info[:actions]&.size || 0
             lines << "- **#{name}** — #{action_count} actions"
           end
@@ -61,9 +67,9 @@ module RailsAiContext
           text_response(lines.join("\n"))
 
         when "standard"
-          lines = [ "# Controllers (#{controllers.size})", "" ]
-          controllers.keys.sort.each do |name|
-            info = controllers[name]
+          lines = [ "# Controllers (#{app_controllers.size})", "" ]
+          app_controllers.keys.sort.each do |name|
+            info = app_controllers[name]
             actions = info[:actions]&.join(", ") || "none"
             lines << "- **#{name}** — #{actions}"
           end
@@ -71,22 +77,55 @@ module RailsAiContext
           text_response(lines.join("\n"))
 
         when "full"
-          lines = [ "# Controllers (#{controllers.size})", "" ]
-          controllers.keys.sort.each do |name|
-            info = controllers[name]
-            lines << "## #{name}"
-            lines << "- Actions: #{info[:actions]&.join(', ')}" if info[:actions]&.any?
-            if info[:filters]&.any?
-              lines << "- Filters: #{info[:filters].map { |f| "#{f[:kind]} #{f[:name]}" }.join(', ')}"
+          lines = [ "# Controllers (#{app_controllers.size})", "" ]
+
+          # Group sibling controllers that share the same parent and identical structure
+          grouped = app_controllers.keys.sort.group_by do |name|
+            info = app_controllers[name]
+            parent = info[:parent_class]
+            # Group by parent + actions + filters + params fingerprint
+            if parent && parent != "ApplicationController"
+              actions_sig = info[:actions]&.sort&.join(",")
+              filters_sig = info[:filters]&.map { |f| "#{f[:kind]}:#{f[:name]}" }&.sort&.join(",")
+              params_sig = info[:strong_params]&.sort&.join(",")
+              "#{parent}|#{actions_sig}|#{filters_sig}|#{params_sig}"
+            else
+              name # unique key = no grouping
             end
-            lines << "- Strong params: #{info[:strong_params].join(', ')}" if info[:strong_params]&.any?
-            lines << ""
+          end
+
+          grouped.each do |_key, names|
+            if names.size > 2 && app_controllers[names.first][:parent_class] != "ApplicationController"
+              # Compress group: show once with all names
+              info = app_controllers[names.first]
+              short_names = names.map { |n| n.sub(/Controller$/, "").split("::").last }
+              parent = info[:parent_class] || "ApplicationController"
+              lines << "## #{names.first.split('::').first}::* (#{short_names.join(', ')})"
+              lines << "- Inherits: #{parent}"
+              lines << "- Actions: #{info[:actions]&.join(', ')}" if info[:actions]&.any?
+              if info[:filters]&.any?
+                lines << "- Filters: #{info[:filters].map { |f| "#{f[:kind]} #{f[:name]}" }.join(', ')}"
+              end
+              lines << "- Strong params: #{info[:strong_params].join(', ')}" if info[:strong_params]&.any?
+              lines << ""
+            else
+              names.each do |name|
+                info = app_controllers[name]
+                lines << "## #{name}"
+                lines << "- Actions: #{info[:actions]&.join(', ')}" if info[:actions]&.any?
+                if info[:filters]&.any?
+                  lines << "- Filters: #{info[:filters].map { |f| "#{f[:kind]} #{f[:name]}" }.join(', ')}"
+                end
+                lines << "- Strong params: #{info[:strong_params].join(', ')}" if info[:strong_params]&.any?
+                lines << ""
+              end
+            end
           end
           text_response(lines.join("\n"))
 
         else
-          list = controllers.keys.sort.map { |c| "- #{c}" }.join("\n")
-          text_response("# Controllers (#{controllers.size})\n\n#{list}")
+          list = app_controllers.keys.sort.map { |c| "- #{c}" }.join("\n")
+          text_response("# Controllers (#{app_controllers.size})\n\n#{list}")
         end
       end
 
@@ -132,7 +171,15 @@ module RailsAiContext
         end
 
         if info[:strong_params]&.any?
-          lines << "" << "## Strong Params" << "- #{info[:strong_params].join(', ')}"
+          lines << "" << "## Strong Params"
+          info[:strong_params].each do |param_method|
+            body = extract_method_with_lines(source_path, param_method)
+            if body
+              lines << "```ruby" << body[:code] << "```"
+            else
+              lines << "- `#{param_method}`"
+            end
+          end
         end
 
         lines.join("\n")
@@ -147,15 +194,16 @@ module RailsAiContext
         start_idx = source_lines.index { |l| l.match?(/^\s*def\s+#{Regexp.escape(method_name.to_s)}\b/) }
         return nil unless start_idx
 
-        depth = 0
+        # Use indentation-based matching — much more reliable than regex depth counting.
+        # The `end` for a `def` is always at the same indentation level.
+        def_indent = source_lines[start_idx][/\A\s*/].length
         result = []
         end_idx = start_idx
         source_lines[start_idx..].each_with_index do |line, i|
-          depth += line.scan(/\b(?:def|do|if|unless|case|begin|class|module)\b/).size
-          depth -= line.scan(/\bend\b/).size
           result << line.rstrip
           end_idx = start_idx + i
-          break if depth <= 0
+          # Stop at `end` with same indentation as `def` (skip the def line itself)
+          break if i > 0 && line.match?(/\A\s{#{def_indent}}end\b/)
         end
 
         {

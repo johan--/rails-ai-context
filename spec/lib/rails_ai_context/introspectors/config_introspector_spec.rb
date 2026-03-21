@@ -44,6 +44,14 @@ RSpec.describe RailsAiContext::Introspectors::ConfigIntrospector do
       expect(result[:current_attributes]).to be_an(Array)
     end
 
+    it "returns queue adapter" do
+      expect(result[:queue_adapter]).to be_a(String)
+    end
+
+    it "returns mailer settings or nil" do
+      expect(result[:mailer]).to be_nil.or(be_a(Hash))
+    end
+
     it "does not return an error" do
       expect(result).not_to have_key(:error)
     end

@@ -78,10 +78,16 @@ module RailsAiContext
         when "standard"
           limit ||= 15
           paginated = tables.keys.sort.drop(offset).first(limit)
+          if paginated.empty?
+            return text_response("No tables at offset #{offset}. Total tables: #{total}. Use `offset:0` to start from the beginning.")
+          end
           lines = [ "# Schema (#{total} tables, showing #{paginated.size})", "" ]
           paginated.each do |name|
             data = tables[name]
-            cols = (data[:columns] || []).map { |c| "#{c[:name]}:#{c[:type]}" }.join(", ")
+            timestamp_cols = %w[id created_at updated_at]
+            cols = (data[:columns] || [])
+              .reject { |c| timestamp_cols.include?(c[:name]) }
+              .map { |c| "#{c[:name]}:#{c[:type]}" }.join(", ")
             lines << "### #{name}"
             lines << cols
             lines << ""
@@ -107,12 +113,26 @@ module RailsAiContext
       end
 
       private_class_method def self.format_table_markdown(name, data)
-        lines = [ "## Table: #{name}", "" ]
-        lines << "| Column | Type | Nullable | Default |"
-        lines << "|--------|------|----------|---------|"
+        columns = data[:columns] || []
+        has_nullable = columns.any? { |c| c[:null] }
+        has_defaults = columns.any? { |c| c[:default] }
 
-        (data[:columns] || []).each do |col|
-          lines << "| #{col[:name]} | #{col[:type]} | #{col[:null] ? 'yes' : 'no'} | #{col[:default] || '-'} |"
+        lines = [ "## Table: #{name}", "" ]
+
+        # Only show Nullable/Default columns when they have meaningful values
+        header = "| Column | Type"
+        sep = "|--------|-----"
+        header += " | Nullable" if has_nullable
+        sep += "-|----------" if has_nullable
+        header += " | Default" if has_defaults
+        sep += "-|---------" if has_defaults
+        lines << "#{header} |" << "#{sep}|"
+
+        columns.each do |col|
+          line = "| #{col[:name]} | #{col[:type]}"
+          line += " | #{col[:null] ? 'yes' : 'no'}" if has_nullable
+          line += " | #{col[:default]}" if has_defaults
+          lines << "#{line} |"
         end
 
         if data[:indexes]&.any?

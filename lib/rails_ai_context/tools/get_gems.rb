@@ -26,9 +26,7 @@ module RailsAiContext
         notable = gems[:notable_gems] || []
         notable = notable.select { |g| g[:category] == category } unless category == "all"
 
-        lines = [ "# Gem Analysis", "" ]
-        lines << "Total gems: #{gems[:total_gems]}"
-        lines << ""
+        lines = [ "# Notable Gems" ]
 
         if notable.any?
           current_cat = nil
@@ -37,7 +35,7 @@ module RailsAiContext
               current_cat = g[:category]
               lines << "" << "## #{current_cat.capitalize}"
             end
-            lines << "- **#{g[:name]}** (#{g[:version]}): #{g[:note]}"
+            lines << "- **#{g[:name]}**: #{g[:note]}"
           end
         else
           lines << "_No notable gems found#{" in category '#{category}'" unless category == 'all'}._"
