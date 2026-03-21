@@ -233,7 +233,7 @@ module RailsAiContext
         case framework
         when "rspec" then "bundle exec rspec"
         when "minitest" then "rails test"
-        else "bundle exec rspec"
+        else "rails test"
         end
       end
 
@@ -259,7 +259,7 @@ module RailsAiContext
         case framework
         when "rspec" then "bundle exec rspec"
         when "minitest" then "rails test"
-        else "bundle exec rspec"
+        else "rails test"
         end
       end
 

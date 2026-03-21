@@ -137,10 +137,20 @@ module RailsAiContext
         lines << "## Conventions"
         lines << "- Follow existing patterns and naming conventions"
         lines << "- Use MCP tools to check schema before writing migrations"
-        lines << "- Run `bundle exec rspec` after changes"
+        lines << "- Run `#{detect_test_command}` after changes"
         lines << ""
 
         lines.join("\n")
+      end
+
+      def detect_test_command
+        tests = context[:tests]
+        framework = tests.is_a?(Hash) ? tests[:framework] : nil
+        case framework
+        when "rspec" then "bundle exec rspec"
+        when "minitest" then "rails test"
+        else "rails test"
+        end
       end
     end
 
