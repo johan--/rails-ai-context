@@ -169,7 +169,13 @@ module RailsAiContext
           return "# #{rel}\n\n```ruby\n#{content}\n```"
         end
 
-        "No test file found for #{name}. Searched: #{candidates.join(', ')}"
+        # List nearby test files to help the agent find the right one
+        test_dirs = candidates.map { |c| File.dirname(Rails.root.join(c)) }.uniq
+        nearby = test_dirs.flat_map do |dir|
+          Dir.exist?(dir) ? Dir.glob(File.join(dir, "*")).map { |f| f.sub("#{Rails.root}/", "") }.first(10) : []
+        end
+        hint = nearby.any? ? "\n\nFiles in test directory: #{nearby.join(', ')}" : ""
+        "No test file found for #{name}. Searched: #{candidates.join(', ')}#{hint}"
       end
     end
   end

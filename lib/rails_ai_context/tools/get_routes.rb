@@ -56,9 +56,10 @@ module RailsAiContext
           by_controller = by_controller.reject { |k, _| INTERNAL_PREFIXES.any? { |p| k.downcase.start_with?(p) } }
         end
 
-        # Filter by controller
+        # Filter by controller — accepts both slash and :: notation
         if controller
-          filtered = by_controller.select { |k, _| k.downcase.include?(controller.downcase) }
+          normalized = controller.downcase.tr("::", "/").delete_suffix("controller")
+          filtered = by_controller.select { |k, _| k.downcase.include?(normalized) }
           return text_response("No routes for '#{controller}'. Controllers: #{by_controller.keys.sort.join(', ')}") if filtered.empty?
           by_controller = filtered
         end

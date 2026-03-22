@@ -67,7 +67,8 @@ module RailsAiContext
 
         # Path traversal protection
         unless Dir.exist?(search_path)
-          return text_response("Path not found: #{path}")
+          top_dirs = Dir.glob(File.join(root, "*")).select { |f| File.directory?(f) }.map { |f| File.basename(f) }.sort
+          return text_response("Path not found: #{path}. Top-level directories: #{top_dirs.first(15).join(', ')}")
         end
 
         begin

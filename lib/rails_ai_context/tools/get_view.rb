@@ -174,7 +174,10 @@ module RailsAiContext
 
         # Path traversal protection (resolves symlinks)
         unless File.exist?(full_path)
-          return text_response("View not found: #{path}")
+          dir = File.dirname(path)
+          siblings = Dir.glob(File.join(views_dir, dir, "*")).map { |f| "#{dir}/#{File.basename(f)}" }.sort.first(10)
+          hint = siblings.any? ? " Files in #{dir}/: #{siblings.join(', ')}" : ""
+          return text_response("View not found: #{path}.#{hint}")
         end
         begin
           unless File.realpath(full_path).start_with?(File.realpath(views_dir))

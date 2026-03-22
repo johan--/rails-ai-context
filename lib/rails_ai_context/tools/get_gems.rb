@@ -38,7 +38,9 @@ module RailsAiContext
             lines << "- **#{g[:name]}**: #{g[:note]}"
           end
         else
-          lines << "_No notable gems found#{" in category '#{category}'" unless category == 'all'}._"
+          all_cats = (gems[:notable_gems] || []).map { |g| g[:category] }.uniq.sort
+          hint = all_cats.any? ? " Available categories: #{all_cats.join(', ')}" : ""
+          lines << "_No notable gems found#{" in category '#{category}'" unless category == 'all'}.#{hint}_"
         end
 
         text_response(lines.join("\n"))
