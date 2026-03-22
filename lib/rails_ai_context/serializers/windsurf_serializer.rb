@@ -5,6 +5,8 @@ module RailsAiContext
     # Generates .windsurfrules within Windsurf's hard 6,000 character limit.
     # Always produces compact output regardless of context_mode.
     class WindsurfSerializer
+      include TestCommandDetection
+
       MAX_CHARS = 5_800 # Leave buffer below 6K limit
 
       attr_reader :context
@@ -169,7 +171,7 @@ module RailsAiContext
         lines << "# Rules"
         lines << "- Follow existing patterns"
         lines << "- Check schema via MCP before writing migrations"
-        lines << "- Run tests after changes"
+        lines << "- Run `#{detect_test_command}` after changes"
         lines << "- After editing: use rails_validate, do NOT re-read files to verify"
         lines << "- Stimulus controllers auto-register — no manual import needed"
 

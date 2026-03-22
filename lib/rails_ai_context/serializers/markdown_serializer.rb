@@ -5,6 +5,8 @@ module RailsAiContext
     # Generates AI-friendly markdown context files from introspection data.
     # Outputs: CLAUDE.md (for Claude Code), .windsurfrules, etc.
     class MarkdownSerializer # rubocop:disable Metrics/ClassLength
+      include TestCommandDetection
+
       attr_reader :context
 
       def initialize(context)
@@ -502,16 +504,6 @@ module RailsAiContext
           ---
           _This context file is auto-generated. Run `rails ai:context` to regenerate._
         MD
-      end
-
-      def detect_test_command
-        tests = context[:tests]
-        framework = tests.is_a?(Hash) ? tests[:framework] : nil
-        case framework
-        when "rspec" then "bundle exec rspec"
-        when "minitest" then "rails test"
-        else "rails test"
-        end
       end
     end
   end

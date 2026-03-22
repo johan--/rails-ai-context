@@ -6,6 +6,8 @@ module RailsAiContext
     # In :compact mode (default), produces ≤150 lines with MCP tool references.
     # In :full mode, delegates to MarkdownSerializer with behavioral rules.
     class ClaudeSerializer
+      include TestCommandDetection
+
       attr_reader :context
 
       def initialize(context)
@@ -272,16 +274,6 @@ module RailsAiContext
         ]
       end
 
-      def detect_test_command
-        tests = context[:tests]
-        framework = tests.is_a?(Hash) ? tests[:framework] : nil
-        case framework
-        when "rspec" then "bundle exec rspec"
-        when "minitest" then "rails test"
-        else "rails test"
-        end
-      end
-
       def render_footer
         [
           "## Rules",
@@ -299,17 +291,9 @@ module RailsAiContext
 
     # Internal: full-mode Claude serializer (wraps MarkdownSerializer with behavioral rules)
     class FullClaudeSerializer < MarkdownSerializer
-      private
+      include TestCommandDetection
 
-      def detect_test_command
-        tests = context[:tests]
-        framework = tests.is_a?(Hash) ? tests[:framework] : nil
-        case framework
-        when "rspec" then "bundle exec rspec"
-        when "minitest" then "rails test"
-        else "rails test"
-        end
-      end
+      private
 
       def header
         <<~MD

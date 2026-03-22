@@ -6,6 +6,8 @@ module RailsAiContext
     # In :compact mode (default), produces ≤500 lines with MCP tool references.
     # In :full mode, delegates to MarkdownSerializer with Copilot header.
     class CopilotSerializer
+      include TestCommandDetection
+
       attr_reader :context
 
       def initialize(context)
@@ -141,16 +143,6 @@ module RailsAiContext
         lines << ""
 
         lines.join("\n")
-      end
-
-      def detect_test_command
-        tests = context[:tests]
-        framework = tests.is_a?(Hash) ? tests[:framework] : nil
-        case framework
-        when "rspec" then "bundle exec rspec"
-        when "minitest" then "rails test"
-        else "rails test"
-        end
       end
     end
 
