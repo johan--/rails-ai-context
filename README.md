@@ -302,7 +302,7 @@ end
 | `max_tool_response_chars` | `120_000` | Safety cap for MCP tool responses |
 | `excluded_models` | internal Rails models | Models to skip during introspection |
 | `excluded_paths` | `node_modules tmp log vendor .git` | Paths excluded from code search |
-| `sensitive_patterns` | `.env .env.* *.key *.pem config/master.key config/credentials.yml.enc` | File patterns blocked from search and read tools |
+| `sensitive_patterns` | `.env .env.* config/master.key config/credentials.yml.enc config/credentials/*.yml.enc *.pem *.key` | File patterns blocked from search and read tools |
 | `auto_mount` | `false` | Auto-mount HTTP MCP endpoint |
 | `http_path` | `"/mcp"` | HTTP endpoint path |
 | `http_port` | `6029` | HTTP server port |

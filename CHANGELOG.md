@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **ERB validation** — now catches missing `<% end %>` by compiling ERB to Ruby then syntax-checking the result (was only checking ERB tag syntax).
+- **Controller namespace format** — accepts both `Bonus::CrisesController` and `bonus/crises` (cross-tool consistency).
+- **Layouts discoverable** — `controller:"layouts"` now works in view tool.
+- **Validate error detail** — Ruby shows up to 5 error lines, JS shows 3 (was truncated to 1).
+- **Invalid/empty regex** — early validation with clear error messages instead of silent fail.
+- **Route count accuracy** — shows filtered count when `app_only:true`, not unfiltered total.
+- **Namespace test lookup** — supports `bonus/crises` format and flat test directories.
+- **Empty inputs** — `near:""` in edit_context and `pattern:""` in search return helpful errors.
+
 ## [0.15.4] - 2026-03-22
 
 ### Fixed

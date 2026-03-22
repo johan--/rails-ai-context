@@ -146,22 +146,23 @@ end
 | `app/models/AGENTS.md` | Model reference | Auto-loaded by OpenCode when reading files in `app/models/`. |
 | `app/controllers/AGENTS.md` | Controller reference | Auto-loaded by OpenCode when reading files in `app/controllers/`. |
 
-### Cursor (6 files)
+### Cursor (5 files)
 
 | File | Purpose | Notes |
 |------|---------|-------|
 | `.cursor/rules/rails-project.mdc` | Project overview | `alwaysApply: true` — loaded in every conversation. |
 | `.cursor/rules/rails-models.mdc` | Model reference | `globs: app/models/**/*.rb` — auto-attaches when editing models. |
 | `.cursor/rules/rails-controllers.mdc` | Controller reference | `globs: app/controllers/**/*.rb` — auto-attaches when editing controllers. |
-| `.cursor/rules/rails-ui-patterns.mdc` | UI patterns and design tokens | `alwaysApply: true` — loaded in every conversation. |
+| `.cursor/rules/rails-ui-patterns.mdc` | UI patterns and design tokens | `globs: app/views/**/*.erb` — loaded when editing views. |
 | `.cursor/rules/rails-mcp-tools.mdc` | MCP tool reference | `alwaysApply: true` — always available. |
 
-### Windsurf (3 files)
+### Windsurf (4 files)
 
 | File | Purpose | Notes |
 |------|---------|-------|
 | `.windsurfrules` | Main context file | Hard-capped at 5,800 chars (Windsurf's 6K limit). Truncated silently if exceeded. |
 | `.windsurf/rules/rails-context.md` | Project overview | New Windsurf rules format. |
+| `.windsurf/rules/rails-ui-patterns.md` | UI patterns and design tokens | Loaded when editing views. |
 | `.windsurf/rules/rails-mcp-tools.md` | MCP tool reference | Compact — respects 6K per-file limit. |
 
 ### GitHub Copilot (6 files)
@@ -172,7 +173,7 @@ end
 | `.github/instructions/rails-models.instructions.md` | Model context | `applyTo: app/models/**/*.rb` — loaded when editing models. |
 | `.github/instructions/rails-controllers.instructions.md` | Controller context | `applyTo: app/controllers/**/*.rb` — loaded when editing controllers. |
 | `.github/instructions/rails-context.instructions.md` | Project context and conventions | `applyTo: **/*` — loaded everywhere. |
-| `.github/instructions/rails-ui-patterns.instructions.md` | UI patterns and design tokens | `applyTo: **/*` — loaded everywhere. |
+| `.github/instructions/rails-ui-patterns.instructions.md` | UI patterns and design tokens | `applyTo: app/views/**/*.erb` — loaded when editing views. |
 | `.github/instructions/rails-mcp-tools.instructions.md` | MCP tool reference | `applyTo: **/*` — loaded everywhere. |
 
 ### Generic (1 file)
@@ -359,8 +360,11 @@ Returns controller details: actions, filters, strong params, concerns.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `controller` | string | Specific controller name (e.g. `UsersController`). Case-insensitive. |
+| `controller` | string | Specific controller name (e.g. `UsersController`, `cooks`, `bonus/crises`). Case-insensitive, flexible format. |
+| `action` | string | Specific action (e.g. `index`). Requires controller. Returns source code with applicable filters. |
 | `detail` | string | `summary` / `standard` (default) / `full`. Ignored when controller is specified. |
+| `limit` | integer | Max controllers to return when listing. Default: 50. |
+| `offset` | integer | Skip this many controllers for pagination. Default: 0. |
 
 **Examples:**
 
@@ -382,7 +386,7 @@ rails_get_controllers(detail: "full")
 
 Returns application configuration. No parameters.
 
-**Returns:** cache store, session store, timezone, middleware stack, initializers, credentials keys, current attributes.
+**Returns:** cache store, session store, timezone, queue adapter, mailer settings, custom middleware, initializers, current attributes.
 
 ```
 rails_get_config()
@@ -391,20 +395,35 @@ rails_get_config()
 
 ### rails_get_test_info
 
-Returns test infrastructure details. No parameters.
+Returns test infrastructure details. Optionally filter by model or controller to find existing tests.
 
-**Returns:** test framework (rspec/minitest), factories/fixtures with locations and counts, system tests, CI config, coverage tool, test helpers.
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `model` | string | Show tests for a specific model (e.g. `User`). |
+| `controller` | string | Show tests for a specific controller (e.g. `Cooks`). |
+| `detail` | string | `summary` / `standard` (default) / `full`. |
 
 ```
 rails_get_test_info()
-  → Framework: rspec, Factories: spec/factories (12 files), CI: .github/workflows/ci.yml, ...
+  → Framework: rspec, Factories: spec/factories (12 files), CI: .github/workflows/ci.yml
+
+rails_get_test_info(model: "User")
+  → Shows spec/models/user_spec.rb test names (summary/standard) or full source (full)
 ```
 
 ### rails_get_gems
 
-Returns notable gems categorized by function. No parameters.
+Returns notable gems categorized by function.
 
-**Returns:** 70+ recognized gems grouped by category (auth, background_jobs, admin, monitoring, search, pagination, etc.) with versions and descriptions.
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `category` | string | Filter by category: `auth`, `jobs`, `frontend`, `api`, `database`, `files`, `testing`, `deploy`, `all` (default). |
+
+**Returns:** Notable gems grouped by category with descriptions.
 
 ```
 rails_get_gems()
