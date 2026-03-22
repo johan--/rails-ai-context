@@ -297,6 +297,8 @@ Returns model details: associations, validations, scopes, enums, callbacks, conc
 |-------|------|-------------|
 | `model` | string | Model class name (e.g. `User`). Case-insensitive. Omit for listing. |
 | `detail` | string | `summary` / `standard` (default) / `full`. Ignored when model is specified. |
+| `limit` | integer | Max models to return when listing. Default: 50. |
+| `offset` | integer | Skip models for pagination. Default: 0. |
 
 **Examples:**
 
@@ -329,6 +331,7 @@ Returns all routes: HTTP verbs, paths, controller actions, route names.
 | `detail` | string | `summary` / `standard` (default) / `full` |
 | `limit` | integer | Max routes to return. Default: 100 (standard), 200 (full). |
 | `offset` | integer | Skip routes for pagination. Default: 0. |
+| `app_only` | boolean | Filter out internal Rails routes (Active Storage, Action Mailbox, Conductor, etc.). Default: true. |
 
 **Examples:**
 
@@ -386,7 +389,7 @@ rails_get_controllers(detail: "full")
 
 Returns application configuration. No parameters.
 
-**Returns:** cache store, session store, timezone, queue adapter, mailer settings, custom middleware, initializers, current attributes.
+**Returns:** cache store, session store, timezone, queue adapter, mailer settings, custom middleware (framework defaults are filtered out), notable initializers, CurrentAttributes classes.
 
 ```
 rails_get_config()
@@ -441,6 +444,108 @@ rails_get_conventions()
   → Architecture: [MVC, Service objects, Concerns], Patterns: [STI, Polymorphism], ...
 ```
 
+### rails_get_stimulus
+
+Returns Stimulus controller details: targets, values, actions, outlets, classes.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `controller` | string | Specific Stimulus controller name (e.g. `hello`, `filter-form`). Case-insensitive. |
+| `detail` | string | `summary` / `standard` (default) / `full` |
+| `limit` | integer | Max controllers to return when listing. Default: 50. |
+| `offset` | integer | Skip controllers for pagination. Default: 0. |
+
+**Examples:**
+
+```
+rails_get_stimulus()
+  → Standard: controller names with targets and actions
+
+rails_get_stimulus(detail: "summary")
+  → Names with target/action counts
+
+rails_get_stimulus(controller: "filter-form")
+  → Full detail: targets, actions, values, outlets, classes, file path
+
+rails_get_stimulus(detail: "full")
+  → All controllers with all details
+```
+
+### rails_get_view
+
+Returns view template contents, partials, and Stimulus controller references.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `controller` | string | Filter views by controller name (e.g. `cooks`, `brand_profiles`). Use `layouts` for layout files. |
+| `path` | string | Specific view path relative to `app/views` (e.g. `cooks/index.html.erb`). Returns full content. |
+| `detail` | string | `summary` / `standard` (default) / `full` |
+
+**Examples:**
+
+```
+rails_get_view()
+  → Standard: all view files with partial/stimulus refs
+
+rails_get_view(controller: "cooks")
+  → All templates and partials for CooksController
+
+rails_get_view(path: "cooks/index.html.erb")
+  → Full template content
+
+rails_get_view(controller: "layouts")
+  → Layout files
+
+rails_get_view(controller: "cooks", detail: "full")
+  → Full template content for all cooks views
+```
+
+### rails_get_edit_context
+
+Returns just enough context to make a surgical Edit to a file. Returns the target area with line numbers and surrounding code.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `file` | string | **Required.** File path relative to Rails root (e.g. `app/models/cook.rb`). |
+| `near` | string | **Required.** What to find — a method name, keyword, or string to locate (e.g. `scope`, `def index`). |
+| `context_lines` | integer | Lines of context above and below the match. Default: 5. |
+
+**Examples:**
+
+```
+rails_get_edit_context(file: "app/models/cook.rb", near: "scope")
+  → Code around the first scope with line numbers, expanded to full method
+
+rails_get_edit_context(file: "app/controllers/cooks_controller.rb", near: "def index")
+  → The index action source with surrounding context
+```
+
+### rails_validate
+
+Validates syntax of multiple files at once (Ruby, ERB, JavaScript).
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `files` | array | **Required.** File paths relative to Rails root (e.g. `["app/models/cook.rb", "app/views/cooks/index.html.erb"]`). |
+
+**Examples:**
+
+```
+rails_validate(files: ["app/models/cook.rb"])
+  → ✓ app/models/cook.rb — syntax OK
+
+rails_validate(files: ["app/models/cook.rb", "app/controllers/cooks_controller.rb", "app/views/cooks/index.html.erb"])
+  → Checks all three files, reports pass/fail for each
+```
+
 ### rails_search_code
 
 Ripgrep-powered regex search across the codebase.
@@ -450,8 +555,10 @@ Ripgrep-powered regex search across the codebase.
 | Param | Type | Description |
 |-------|------|-------------|
 | `pattern` | string | **Required.** Regex pattern to search for. |
+| `path` | string | Subdirectory to search in (e.g. `app/models`, `config`). Default: entire app. |
 | `file_type` | string | Filter by file type (e.g. `rb`, `erb`, `js`). Alphanumeric only. |
-| `max_results` | integer | Max results to return. Default: 20, max: 100. |
+| `max_results` | integer | Max results to return. Default: 30, max: 100. |
+| `context_lines` | integer | Lines of context before and after each match (like grep -C). Default: 0, max: 5. |
 
 **Examples:**
 
@@ -464,17 +571,27 @@ rails_search_code(pattern: "class.*Controller", file_type: "rb")
 
 rails_search_code(pattern: "def create", file_type: "rb", max_results: 50)
   → First 50 create methods across the codebase
+
+rails_search_code(pattern: "current_user", path: "app/controllers")
+  → Search only in app/controllers/
+
+rails_search_code(pattern: "validates", context_lines: 2)
+  → Matches with 2 lines of context before and after
 ```
 
-**Security:** Uses `Open3.capture2` with array arguments (no shell injection). Validates file_type. Blocks path traversal. Respects `excluded_paths` config.
+**Security:** Uses `Open3.capture2` with array arguments (no shell injection). Validates file_type. Blocks path traversal. Respects `excluded_paths` and `sensitive_patterns` config.
 
 ### Detail Level Summary
 
-| Level | What it returns | Default limit | Best for |
-|-------|----------------|---------------|----------|
+All tools that support `detail` use these three levels. Default limits vary by tool — schema defaults shown below:
+
+| Level | What it returns | Schema default limit | Best for |
+|-------|----------------|---------------------|----------|
 | `summary` | Names + counts | 50 | Getting the landscape, understanding what exists |
 | `standard` | Names + key details | 15 | Working context, column types, action names |
 | `full` | Everything | 5 | Deep inspection, indexes, FKs, constraints |
+
+Other tools default to higher limits (e.g. models/controllers/stimulus: 50 for all levels, routes: 100/200).
 
 ### Recommended Workflow
 
@@ -636,6 +753,49 @@ RailsAiContext.configure do |config|
   # Paths to exclude from code search
   config.excluded_paths += %w[vendor/bundle]
 
+  # Sensitive file patterns blocked from search and read tools
+  # config.sensitive_patterns += %w[config/my_secret.yml]
+
+  # Controllers hidden from listings (e.g. Devise internals)
+  # config.excluded_controllers += %w[MyInternalController]
+
+  # Route prefixes hidden with app_only (e.g. admin frameworks)
+  # config.excluded_route_prefixes += %w[admin/]
+
+  # Regex patterns for concerns to hide from model output
+  # config.excluded_concerns += [/MyInternal::/]
+
+  # Framework filter names hidden from controller output
+  # config.excluded_filters += %w[my_internal_filter]
+
+  # Default middleware hidden from config output
+  # config.excluded_middleware += %w[MyMiddleware]
+
+  # --- File size limits ---
+
+  # Per-file read limit for tools (default: 2MB)
+  # config.max_file_size = 2_000_000
+
+  # Test file read limit (default: 500KB)
+  # config.max_test_file_size = 500_000
+
+  # schema.rb / structure.sql parse limit (default: 10MB)
+  # config.max_schema_file_size = 10_000_000
+
+  # Max search results per call (default: 100)
+  # config.max_search_results = 100
+
+  # Max files per validate call (default: 20)
+  # config.max_validate_files = 20
+
+  # --- Search and file discovery ---
+
+  # File extensions for Ruby fallback search
+  # config.search_extensions = %w[rb js erb yml yaml json ts tsx vue svelte haml slim]
+
+  # Where to look for concern source files
+  # config.concern_paths = %w[app/models/concerns app/controllers/concerns]
+
   # --- Live reload ---
 
   # Auto-invalidate MCP tool caches on file changes
@@ -667,6 +827,7 @@ end
 | `cache_ttl` | Integer | `30` | Cache TTL in seconds for introspection results |
 | `excluded_models` | Array | internal Rails models | Models to skip |
 | `excluded_paths` | Array | `node_modules tmp log vendor .git` | Paths excluded from code search |
+| `sensitive_patterns` | Array | `.env`, `.key`, `.pem`, credentials | File patterns blocked from search and read tools |
 | `output_dir` | String | `nil` (Rails.root) | Where to write context files |
 | `auto_mount` | Boolean | `false` | Auto-mount HTTP MCP endpoint |
 | `http_path` | String | `"/mcp"` | HTTP endpoint path |
@@ -675,7 +836,22 @@ end
 | `live_reload` | Symbol/Boolean | `:auto` | `:auto`, `true`, or `false` — enable MCP live reload |
 | `live_reload_debounce` | Float | `1.5` | Debounce interval in seconds for live reload |
 | `server_name` | String | `"rails-ai-context"` | MCP server name |
+| `server_version` | String | gem version | MCP server version |
 | `generate_root_files` | Boolean | `true` | Generate root files (CLAUDE.md, .windsurfrules, etc.) — set `false` for split rules only |
+| `max_file_size` | Integer | `2_000_000` | Per-file read limit for tools (2MB) |
+| `max_test_file_size` | Integer | `500_000` | Test file read limit (500KB) |
+| `max_schema_file_size` | Integer | `10_000_000` | schema.rb / structure.sql parse limit (10MB) |
+| `max_view_total_size` | Integer | `5_000_000` | Total aggregated view content for UI patterns (5MB) |
+| `max_view_file_size` | Integer | `500_000` | Per-view file during aggregation (500KB) |
+| `max_search_results` | Integer | `100` | Max search results per call |
+| `max_validate_files` | Integer | `20` | Max files per validate call |
+| `excluded_controllers` | Array | `DeviseController`, etc. | Controller classes hidden from listings |
+| `excluded_route_prefixes` | Array | `action_mailbox/`, `active_storage/`, etc. | Route controller prefixes hidden with `app_only` |
+| `excluded_concerns` | Array | framework regex patterns | Regex patterns for concerns to hide from model output |
+| `excluded_filters` | Array | `verify_authenticity_token`, etc. | Framework filter names hidden from controller output |
+| `excluded_middleware` | Array | standard Rails middleware | Default middleware hidden from config output |
+| `search_extensions` | Array | `rb js erb yml yaml json ts tsx vue svelte haml slim` | File extensions for Ruby fallback search |
+| `concern_paths` | Array | `app/models/concerns app/controllers/concerns` | Where to look for concern source files |
 
 ### Root file generation
 
@@ -750,7 +926,7 @@ config.preset = :full
 
 ```ruby
 # Start with standard, add specific ones
-config.introspectors += %i[views turbo auth api stimulus]
+config.introspectors += %i[views turbo auth api]
 
 # Or build from scratch
 config.introspectors = %i[schema models routes gems auth api]

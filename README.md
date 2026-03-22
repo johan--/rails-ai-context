@@ -295,22 +295,45 @@ end
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| **Presets & Introspectors** | | |
 | `preset` | `:standard` | Introspector preset (`:standard` or `:full`) |
 | `introspectors` | 13 core | Array of introspector symbols |
+| **Context Generation** | | |
 | `context_mode` | `:compact` | `:compact` (≤150 lines) or `:full` (dump everything) |
 | `claude_max_lines` | `150` | Max lines for CLAUDE.md in compact mode |
-| `max_tool_response_chars` | `120_000` | Safety cap for MCP tool responses |
-| `excluded_models` | internal Rails models | Models to skip during introspection |
-| `excluded_paths` | `node_modules tmp log vendor .git` | Paths excluded from code search |
-| `sensitive_patterns` | `.env .env.* config/master.key config/credentials.yml.enc config/credentials/*.yml.enc *.pem *.key` | File patterns blocked from search and read tools |
+| `generate_root_files` | `true` | Generate root files (CLAUDE.md, etc.) — set `false` for split rules only |
+| `output_dir` | `Rails.root` | Output directory for generated context files |
+| **MCP Server** | | |
+| `server_name` | `"rails-ai-context"` | MCP server name |
+| `server_version` | gem version | MCP server version |
 | `auto_mount` | `false` | Auto-mount HTTP MCP endpoint |
 | `http_path` | `"/mcp"` | HTTP endpoint path |
 | `http_port` | `6029` | HTTP server port |
 | `http_bind` | `"127.0.0.1"` | HTTP server bind address |
 | `cache_ttl` | `30` | Cache TTL in seconds |
+| `max_tool_response_chars` | `120_000` | Safety cap for MCP tool responses |
 | `live_reload` | `:auto` | `:auto`, `true`, or `false` — MCP live reload |
 | `live_reload_debounce` | `1.5` | Debounce interval in seconds |
-| `generate_root_files` | `true` | Generate root files (CLAUDE.md, etc.) — set `false` for split rules only |
+| **Filtering & Exclusions** | | |
+| `excluded_models` | internal Rails models | Models to skip during introspection |
+| `excluded_paths` | `node_modules tmp log vendor .git` | Paths excluded from code search |
+| `sensitive_patterns` | `.env .env.* config/master.key config/credentials.yml.enc config/credentials/*.yml.enc *.pem *.key` | File patterns blocked from search and read tools |
+| `excluded_controllers` | `DeviseController` etc. | Controller classes hidden from listings |
+| `excluded_route_prefixes` | `action_mailbox/ active_storage/ rails/` etc. | Route controller prefixes hidden with app_only |
+| `excluded_concerns` | Rails/Devise/framework patterns | Regex patterns for concerns to hide |
+| `excluded_filters` | `verify_authenticity_token` etc. | Framework filter names hidden from controller output |
+| `excluded_middleware` | standard Rack/Rails middleware | Default middleware hidden from config output |
+| **File Size Limits** | | |
+| `max_file_size` | `2_000_000` | Per-file read limit for tools (bytes) |
+| `max_test_file_size` | `500_000` | Test file read limit (bytes) |
+| `max_schema_file_size` | `10_000_000` | schema.rb / structure.sql parse limit (bytes) |
+| `max_view_total_size` | `5_000_000` | Total aggregated view content for UI patterns (bytes) |
+| `max_view_file_size` | `500_000` | Per-view file during aggregation (bytes) |
+| `max_search_results` | `100` | Max search results per call |
+| `max_validate_files` | `20` | Max files per validate call |
+| **Search & Discovery** | | |
+| `search_extensions` | `rb js erb yml yaml json ts tsx vue svelte haml slim` | File extensions for Ruby fallback search |
+| `concern_paths` | `app/models/concerns app/controllers/concerns` | Where to look for concern source files |
 </details>
 
 ---

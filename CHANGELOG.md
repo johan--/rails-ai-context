@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **7 new configurable options** — `excluded_controllers`, `excluded_route_prefixes`, `excluded_concerns`, `excluded_filters`, `excluded_middleware`, `search_extensions`, `concern_paths` for stack-specific customization.
+- **Configurable file size limits** — `max_file_size`, `max_test_file_size`, `max_schema_file_size`, `max_view_total_size`, `max_view_file_size`, `max_search_results`, `max_validate_files` all exposed via `Configuration`.
+
+### Fixed
+
+- **MCP tool error messages** — all tools now show available values when a lookup fails or input is not found (e.g. "Table not found. Available: users, posts, ...").
+- **Schema defaults accuracy** — supplement live DB nil defaults with values from `schema.rb`.
+- **Optional associations** — `optional: true` now correctly detected on `belongs_to`.
+- **Concern methods** — improved extraction of methods from concern source files.
+
 ## [0.15.5] - 2026-03-22
 
 ### Fixed
