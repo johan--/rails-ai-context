@@ -528,13 +528,14 @@ rails_get_edit_context(file: "app/controllers/cooks_controller.rb", near: "def i
 
 ### rails_validate
 
-Validates syntax of multiple files at once (Ruby, ERB, JavaScript).
+Validates syntax of multiple files at once (Ruby, ERB, JavaScript). Optionally runs Rails-aware semantic checks.
 
 **Parameters:**
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `files` | array | **Required.** File paths relative to Rails root (e.g. `["app/models/cook.rb", "app/views/cooks/index.html.erb"]`). |
+| `level` | string | `syntax` (default) — check syntax only (fast). `rails` — syntax + semantic checks (partial existence, route helpers, column references, strong params vs schema, callback methods, route-action consistency, has_many dependent, FK indexes, Stimulus controllers). |
 
 **Examples:**
 
@@ -544,6 +545,12 @@ rails_validate(files: ["app/models/cook.rb"])
 
 rails_validate(files: ["app/models/cook.rb", "app/controllers/cooks_controller.rb", "app/views/cooks/index.html.erb"])
   → Checks all three files, reports pass/fail for each
+
+rails_validate(files: ["app/models/cook.rb"], level: "rails")
+  → Syntax check + semantic warnings (e.g. validates :nonexistent_column, has_many without :dependent)
+
+rails_validate(files: ["app/views/cooks/index.html.erb"], level: "rails")
+  → Syntax check + partial existence, route helper validity, Stimulus controller existence
 ```
 
 ### rails_search_code

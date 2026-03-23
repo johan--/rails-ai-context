@@ -113,7 +113,7 @@ The gem exposes **13 read-only tools** via MCP that AI clients call on-demand:
 | `rails_get_view` | View templates, partials, Stimulus references |
 | `rails_get_stimulus` | Stimulus controllers — targets, values, actions, outlets |
 | `rails_get_edit_context` | Surgical edit helper — returns code around a match with line numbers |
-| `rails_validate` | Batch syntax validation for Ruby, ERB, and JavaScript files |
+| `rails_validate` | Batch syntax validation for Ruby, ERB, and JavaScript files. `level:"rails"` adds semantic checks (partials, route helpers, columns, strong params, callbacks, FK indexes, Stimulus) |
 
 ### Smart Detail Levels
 
