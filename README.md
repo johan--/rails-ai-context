@@ -7,7 +7,7 @@
 [![CI](https://github.com/crisnahine/rails-ai-context/actions/workflows/ci.yml/badge.svg)](https://github.com/crisnahine/rails-ai-context/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Built by a Rails developer with 10 years of production experience. Yes, AI helped write this gem — the same way AI helps me ship features at work. I designed the architecture, made every decision, reviewed every line, and wrote 510 tests. The gem exists because I understand Rails deeply enough to know what AI agents get wrong and what context they need to get it right.
+> Built by a Rails developer with 10 years of production experience. Yes, AI helped write this gem — the same way AI helps me ship features at work. I designed the architecture, made every decision, reviewed every line, and wrote 520 tests. The gem exists because I understand Rails deeply enough to know what AI agents get wrong and what context they need to get it right.
 
 ---
 
@@ -62,7 +62,7 @@ Agent: rails_validate(files:["app/models/cook.rb"], level:"rails") → catches c
 |-------|-----------------|---------------|------------|
 | **Static files** (CLAUDE.md, .cursorrules, etc.) | App overview: stack, models, gems, architecture, UI patterns, MCP tool reference | Automatically at session start | ~150 lines, zero tool calls |
 | **Split rules** (.claude/rules/, .cursor/rules/) | Deep reference: full schema with column types, all model associations/scopes, controller listings | Conditionally — only when editing relevant files | Zero when not needed |
-| **Live MCP tools** (13 tools) | Real-time queries: drill into any table, model, controller action, or view on demand. Semantic validation. | On-demand via agent tool calls | ~25-100 lines per call |
+| **Live MCP tools** (14 tools) | Real-time queries: drill into any table, model, controller action, or view on demand. Semantic validation. | On-demand via agent tool calls | ~25-100 lines per call |
 
 **Progressive disclosure:** the agent gets the map for free, reference guides when relevant, and live GPS when building.
 
@@ -72,7 +72,7 @@ Agent: rails_validate(files:["app/models/cook.rb"], level:"rails") → catches c
 
 | Setup | Tokens | What it knows |
 |-------|--------|---------------|
-| **rails-ai-context (full)** | **28,834** | 13 MCP tools + generated docs + split rules |
+| **rails-ai-context (full)** | **28,834** | 14 MCP tools + generated docs + split rules |
 | rails-ai-context CLAUDE.md only | 33,106 | Generated docs + rules, no MCP tools |
 | Normal Claude `/init` | 40,700 | Generic CLAUDE.md only |
 | No rails-ai-context | 45,477 | Nothing — discovers everything from scratch |
@@ -97,9 +97,9 @@ But token savings is the side effect. The real value:
 
 ---
 
-## 13 Live MCP Tools
+## 14 Live MCP Tools
 
-The gem exposes **13 read-only tools** via MCP that AI clients call on-demand:
+The gem exposes **14 read-only tools** via MCP that AI clients call on-demand:
 
 | Tool | What it returns |
 |------|----------------|
@@ -116,6 +116,7 @@ The gem exposes **13 read-only tools** via MCP that AI clients call on-demand:
 | `rails_get_stimulus` | Stimulus controllers — targets, values, actions, outlets |
 | `rails_get_edit_context` | Surgical edit helper — returns code around a match with line numbers |
 | `rails_validate` | Batch syntax validation for Ruby, ERB, and JavaScript files. `level:"rails"` adds semantic checks (partials, route helpers, columns, strong params, callbacks, FK indexes, Stimulus) |
+| `rails_analyze_feature` | End-to-end feature analysis — finds matching models, controllers, routes, and views in one call |
 
 ### Smart Detail Levels
 
@@ -336,6 +337,8 @@ end
 | **Search & Discovery** | | |
 | `search_extensions` | `rb js erb yml yaml json ts tsx vue svelte haml slim` | File extensions for Ruby fallback search |
 | `concern_paths` | `app/models/concerns app/controllers/concerns` | Where to look for concern source files |
+| **Extensibility** | | |
+| `custom_tools` | `[]` | Additional MCP tool classes to register alongside built-in tools |
 </details>
 
 ---
@@ -424,7 +427,7 @@ The gem parses `db/schema.rb` as text when no database is connected. Works in CI
 ```bash
 git clone https://github.com/crisnahine/rails-ai-context.git
 cd rails-ai-context && bundle install
-bundle exec rspec       # 507 examples
+bundle exec rspec       # 520 examples
 bundle exec rubocop     # Lint
 ```
 

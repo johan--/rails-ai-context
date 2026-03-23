@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-23
+
+### Added
+
+- **New composite tool: `rails_analyze_feature`** — one call returns schema + models + controllers + routes for a feature area (e.g., `rails_analyze_feature(feature:"authentication")`). Total MCP tools: 14.
+- **Custom tool registration API** — `config.custom_tools << MyCompany::PolicyCheckTool` lets teams extend the MCP server with their own tools.
+- **Structured error responses with fuzzy suggestions** — `not_found_response` helper in BaseTool with "Did you mean?" fuzzy matching (substring + prefix) and `recovery_action` hints. Applied to schema, models, controllers, and stimulus lookups. AI agents self-correct on first retry.
+- **Cache keys on paginated responses** — every paginated response includes `cache_key` from fingerprint so agents detect stale data between page fetches. Applied to schema, models, controllers, and stimulus pagination.
+
+### Changed
+
+- **LLM-optimized tool descriptions (all 14 tools)** — every description now follows "what it does / Use when: / key params" format so AI agents pick the right tool on first try.
+
 ## [0.15.10] - 2026-03-23
 
 ### Changed

@@ -252,7 +252,7 @@ rails ai:context:claude           # Use this instead (no quoting needed)
 
 ## MCP Tools — Full Reference
 
-All 13 tools are **read-only** and **idempotent** — they never modify your application or database.
+All 14 tools are **read-only** and **idempotent** — they never modify your application or database.
 
 ### rails_get_schema
 
@@ -588,6 +588,36 @@ rails_search_code(pattern: "validates", context_lines: 2)
 
 **Security:** Uses `Open3.capture2` with array arguments (no shell injection). Validates file_type. Blocks path traversal. Respects `excluded_paths` and `sensitive_patterns` config.
 
+### rails_analyze_feature
+
+Analyzes a feature end-to-end: finds matching models, controllers, routes, and views in one call.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `feature` | string | **Required.** Feature keyword to search for (e.g. `authentication`, `User`, `payments`, `orders`). Case-insensitive partial match across models, controllers, and routes. |
+
+**Examples:**
+
+```
+rails_analyze_feature(feature: "authentication")
+  → Models, controllers, and routes matching "authentication"
+
+rails_analyze_feature(feature: "User")
+  → User model with schema columns, associations, validations, scopes;
+    UsersController with actions and filters;
+    all user routes with verbs and paths
+
+rails_analyze_feature(feature: "payments")
+  → Cross-cutting view: Payment model + PaymentsController + payment routes
+
+rails_analyze_feature(feature: "orders")
+  → Everything related to orders across all layers
+```
+
+**Returns:** Markdown with sections for Models (with table, columns, indexes, FKs, associations, validations, scopes), Controllers (with actions and filters), and Routes (with verbs, paths, and route names). Each section shows match counts.
+
 ### Detail Level Summary
 
 All tools that support `detail` use these three levels. Default limits vary by tool — schema defaults shown below:
@@ -716,7 +746,7 @@ RailsAiContext.configure do |config|
 end
 ```
 
-Both transports are **read-only** — they expose the same 13 tools and never modify your app.
+Both transports are **read-only** — they expose the same 14 tools and never modify your app.
 
 ---
 
@@ -751,6 +781,9 @@ RailsAiContext.configure do |config|
 
   # Cache TTL for introspection results (seconds)
   config.cache_ttl = 30
+
+  # Additional MCP tool classes to register alongside built-in tools
+  # config.custom_tools = [MyApp::Tools::CustomTool]
 
   # --- Exclusions ---
 
@@ -838,6 +871,7 @@ end
 | `claude_max_lines` | Integer | `150` | Max lines for CLAUDE.md in compact mode |
 | `max_tool_response_chars` | Integer | `120_000` | Safety cap for MCP tool responses |
 | `cache_ttl` | Integer | `30` | Cache TTL in seconds for introspection results |
+| `custom_tools` | Array | `[]` | Additional MCP tool classes to register alongside built-in tools |
 | `excluded_models` | Array | internal Rails models | Models to skip |
 | `excluded_paths` | Array | `node_modules tmp log vendor .git` | Paths excluded from code search |
 | `sensitive_patterns` | Array | `.env`, `.key`, `.pem`, credentials | File patterns blocked from search and read tools |
