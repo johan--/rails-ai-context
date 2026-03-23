@@ -32,7 +32,7 @@ lib/rails_ai_context/
 1. Create `lib/rails_ai_context/introspectors/your_introspector.rb` (auto-loaded by Zeitwerk)
 2. Implement `#initialize(app)` and `#call` → returns a Hash (never raises)
 3. Register it in `lib/rails_ai_context/introspector.rb` (the `INTROSPECTOR_MAP`)
-4. Add the key to the appropriate preset(s) in `Configuration::PRESETS` (`:standard` for core, `:full` for all)
+4. Add the key to the appropriate preset(s) in `Configuration::PRESETS` (`:full` is the default, `:standard` for core-only)
 5. Write specs in `spec/lib/rails_ai_context/your_introspector_spec.rb`
 
 ## Adding a New MCP Tool

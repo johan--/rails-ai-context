@@ -86,7 +86,7 @@ module RailsAiContext
     def initialize
       @server_name         = "rails-ai-context"
       @server_version      = RailsAiContext::VERSION
-      @introspectors       = PRESETS[:standard].dup
+      @introspectors       = PRESETS[:full].dup
       @excluded_paths      = %w[node_modules tmp log vendor .git]
       @sensitive_patterns  = %w[
         .env .env.* config/master.key config/credentials.yml.enc

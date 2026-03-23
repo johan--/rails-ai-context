@@ -18,8 +18,8 @@ RSpec.describe RailsAiContext::Configuration do
     expect(config.live_reload_debounce).to eq(1.5)
   end
 
-  it "defaults to standard preset" do
-    expect(config.introspectors).to eq(described_class::PRESETS[:standard])
+  it "defaults to full preset" do
+    expect(config.introspectors).to eq(described_class::PRESETS[:full])
   end
 
   it "excludes internal Rails models by default" do

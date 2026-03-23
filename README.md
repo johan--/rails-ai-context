@@ -211,7 +211,7 @@ Root files (CLAUDE.md, AGENTS.md, etc.) use **section markers** — your custom 
 | **DevOps** | Puma, Procfile, Docker, deployment tools, asset pipeline |
 | **Architecture** | Service objects, STI, polymorphism, state machines, multi-tenancy, engines |
 
-29 introspectors total. The `:standard` preset runs 13 core ones by default; use `:full` for 28 (`database_stats` is opt-in, PostgreSQL only).
+29 introspectors total. The `:full` preset runs 28 by default; use `:standard` for 13 core only (`database_stats` is opt-in, PostgreSQL only).
 
 ---
 
@@ -265,8 +265,8 @@ end
 ```ruby
 # config/initializers/rails_ai_context.rb
 RailsAiContext.configure do |config|
-  # Presets: :standard (13 introspectors, default) or :full (all 28)
-  config.preset = :standard
+  # Presets: :full (28 introspectors, default) or :standard (13 core)
+  config.preset = :full
 
   # Cherry-pick on top of a preset
   # config.introspectors += %i[views turbo auth api]
@@ -299,8 +299,8 @@ end
 | Option | Default | Description |
 |--------|---------|-------------|
 | **Presets & Introspectors** | | |
-| `preset` | `:standard` | Introspector preset (`:standard` or `:full`) |
-| `introspectors` | 13 core | Array of introspector symbols |
+| `preset` | `:full` | Introspector preset (`:full` or `:standard`) |
+| `introspectors` | 28 (full) | Array of introspector symbols |
 | **Context Generation** | | |
 | `context_mode` | `:compact` | `:compact` (≤150 lines) or `:full` (dump everything) |
 | `claude_max_lines` | `150` | Max lines for CLAUDE.md in compact mode |

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-23
+
+### Changed
+
+- **Default preset changed to `:full`** — all 28 introspectors now run by default, giving AI assistants richer context out of the box. Introspectors that don't find relevant data return empty hashes with zero overhead. Use `config.preset = :standard` for the previous 13-core default.
+
 ## [1.0.0] - 2026-03-23
 
 ### Added

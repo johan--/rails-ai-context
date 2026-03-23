@@ -757,8 +757,8 @@ Both transports are **read-only** — they expose the same 14 tools and never mo
 RailsAiContext.configure do |config|
   # --- Introspectors ---
 
-  # Presets: :standard (13 core, default) or :full (all 28)
-  config.preset = :standard
+  # Presets: :full (28 introspectors, default) or :standard (13 core)
+  config.preset = :full
 
   # Cherry-pick on top of a preset
   config.introspectors += %i[views turbo auth api]
@@ -865,8 +865,8 @@ end
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `preset` | Symbol | `:standard` | Introspector preset (`:standard` or `:full`) |
-| `introspectors` | Array | 13 core symbols | Which introspectors to run |
+| `preset` | Symbol | `:full` | Introspector preset (`:full` or `:standard`) |
+| `introspectors` | Array | 28 (full preset) | Which introspectors to run |
 | `context_mode` | Symbol | `:compact` | `:compact` or `:full` |
 | `claude_max_lines` | Integer | `150` | Max lines for CLAUDE.md in compact mode |
 | `max_tool_response_chars` | Integer | `120_000` | Safety cap for MCP tool responses |
@@ -922,7 +922,7 @@ All split rules include an app overview file, so no context is lost when root fi
 
 ### Standard preset (13 introspectors)
 
-These run by default. Fast and cover core Rails structure.
+Core Rails structure only. Use `config.preset = :standard` for a lighter footprint.
 
 | Introspector | What it discovers |
 |-------------|-------------------|
@@ -940,7 +940,7 @@ These run by default. Fast and cover core Rails structure.
 | `view_templates` | View file contents, partial references, Stimulus data attributes, UI pattern extraction, model field usage in partials. |
 | `design_tokens` | Auto-detects CSS framework (Tailwind v3/v4, Bootstrap, Sass, plain CSS) and extracts design tokens from config files and built CSS. |
 
-### Full preset (28 introspectors)
+### Full preset (28 introspectors) — default
 
 Includes all standard introspectors plus:
 
@@ -963,16 +963,17 @@ Includes all standard introspectors plus:
 | `multi_database` | Multiple databases, replicas, sharding config, model-specific `connects_to` declarations. database.yml parsing fallback. |
 | `database_stats` | PostgreSQL approximate row counts via `pg_stat_user_tables`. **Opt-in only** — not in any preset, add manually: `config.introspectors += [:database_stats]`. |
 
-### Enabling the full preset
+### Using the standard preset
 
 ```ruby
-config.preset = :full
+config.preset = :standard
 ```
 
 ### Cherry-picking introspectors
 
 ```ruby
 # Start with standard, add specific ones
+config.preset = :standard
 config.introspectors += %i[views turbo auth api]
 
 # Or build from scratch
