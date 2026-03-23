@@ -230,9 +230,18 @@ module RailsAiContext
           matched.each do |c|
             name = c[:name] || c[:file]&.gsub("_controller.js", "")
             lines << "" << "### #{name}"
-            lines << "- **Targets:** #{c[:targets].join(', ')}" if c[:targets]&.any?
-            lines << "- **Values:** #{c[:values].map { |v| "#{v[:name]}:#{v[:type]}" }.join(', ')}" if c[:values]&.any?
-            lines << "- **Actions:** #{c[:actions].join(', ')}" if c[:actions]&.any?
+            lines << "- **Targets:** #{Array(c[:targets]).join(', ')}" if c[:targets]&.any?
+            if c[:values]&.any?
+              val_strs = if c[:values].is_a?(Array)
+                c[:values].select { |v| v.is_a?(Hash) }.map { |v| "#{v[:name]}:#{v[:type]}" }
+              elsif c[:values].is_a?(Hash)
+                c[:values].map { |k, v| "#{k}:#{v}" }
+              else
+                []
+              end
+              lines << "- **Values:** #{val_strs.join(', ')}" if val_strs.any?
+            end
+            lines << "- **Actions:** #{Array(c[:actions]).join(', ')}" if c[:actions]&.any?
           end
           lines << ""
         end
