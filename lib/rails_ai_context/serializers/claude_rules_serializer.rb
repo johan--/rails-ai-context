@@ -5,6 +5,8 @@ module RailsAiContext
     # Generates .claude/rules/ files for Claude Code auto-discovery.
     # These provide quick-reference lists without bloating CLAUDE.md.
     class ClaudeRulesSerializer
+      include StackOverviewHelper
+
       attr_reader :context
 
       def initialize(context)
@@ -76,6 +78,8 @@ module RailsAiContext
         if conv.is_a?(Hash) && !conv[:error]
           (conv[:architecture] || []).first(5).each { |p| lines << "- #{p}" }
         end
+
+        lines.concat(full_preset_stack_lines)
 
         # ApplicationController before_actions — apply to all controllers
         begin
@@ -342,7 +346,7 @@ module RailsAiContext
           "- app/javascript/controllers/index.js — Stimulus auto-registers controllers. No need to read.",
           "- Test files — use `rails_get_test_info(detail:\"full\")` for patterns.",
           "",
-          "## Tools (13)",
+          "## Tools (14)",
           "",
           "**rails_get_schema** — database tables, columns, indexes, foreign keys",
           "- `rails_get_schema(detail:\"summary\")` — all tables with column counts",
@@ -379,6 +383,9 @@ module RailsAiContext
           "",
           "**rails_validate** — syntax checker for edited files",
           "- `rails_validate(files:[\"app/models/cook.rb\"])` — checks Ruby, ERB, JS syntax in one call",
+          "",
+          "**rails_analyze_feature** — combined schema + models + controllers + routes for a feature area",
+          "- `rails_analyze_feature(feature:\"authentication\")` — one call gets everything related to a feature",
           "",
           "**rails_get_config** — cache store, session, timezone, middleware, initializers",
           "**rails_get_gems** — notable gems categorized by function",

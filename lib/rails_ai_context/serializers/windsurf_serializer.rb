@@ -6,6 +6,7 @@ module RailsAiContext
     # Always produces compact output regardless of context_mode.
     class WindsurfSerializer
       include TestCommandDetection
+      include StackOverviewHelper
 
       MAX_CHARS = 5_800 # Leave buffer below 6K limit
 
@@ -41,6 +42,8 @@ module RailsAiContext
 
         routes = context[:routes]
         lines << "Routes: #{routes[:total_routes]}" if routes && !routes[:error]
+
+        lines.concat(full_preset_stack_lines)
 
         # Gems (one line per category)
         gems = context[:gems]
@@ -165,6 +168,7 @@ module RailsAiContext
         lines << "- rails_get_conventions — architecture patterns"
         lines << "- rails_search_code(pattern:\"regex\"|file_type:\"rb\"|max_results:N)"
         lines << "- rails_get_edit_context(file:\"path\"|near:\"keyword\")"
+        lines << "- rails_analyze_feature(feature:\"auth\") — combined context for a feature"
         lines << "- rails_validate(files:[\"path\"])"
         lines << "Start with detail:\"summary\", then drill into specifics."
         lines << ""

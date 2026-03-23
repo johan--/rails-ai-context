@@ -7,6 +7,7 @@ module RailsAiContext
     # In :full mode, delegates to MarkdownSerializer with OpenCode header.
     class OpencodeSerializer
       include TestCommandDetection
+      include StackOverviewHelper
 
       attr_reader :context
 
@@ -78,16 +79,6 @@ module RailsAiContext
           lines << "- Routes: #{routes[:total_routes]} across #{app_ctrls.size} controllers"
         end
 
-        auth = context[:auth]
-        if auth.is_a?(Hash) && !auth[:error]
-          parts = []
-          parts << "Devise" if auth.dig(:authentication, :devise)&.any?
-          parts << "Rails 8 auth" if auth.dig(:authentication, :rails_auth)
-          parts << "Pundit" if auth.dig(:authorization, :pundit)&.any?
-          parts << "CanCanCan" if auth.dig(:authorization, :cancancan)
-          lines << "- Auth: #{parts.join(" + ")}" if parts.any?
-        end
-
         jobs = context[:jobs]
         if jobs.is_a?(Hash) && !jobs[:error]
           job_count = jobs[:jobs]&.size || 0
@@ -105,6 +96,8 @@ module RailsAiContext
           pending = migrations[:pending]
           lines << "- Migrations: #{migrations[:total]} total, #{pending&.size || 0} pending"
         end
+
+        lines.concat(full_preset_stack_lines)
 
         lines << ""
         lines
@@ -186,7 +179,7 @@ module RailsAiContext
 
       def render_mcp_guide # rubocop:disable Metrics/MethodLength
         [
-          "## MCP Tools (13) — ALWAYS Use These First",
+          "## MCP Tools (14) — ALWAYS Use These First",
           "",
           "Use MCP for reference files (schema, routes, tests). Read directly if you'll edit.",
           "MCP tools return line numbers. Start with `detail:\"summary\"`.",
@@ -199,6 +192,7 @@ module RailsAiContext
           "- `rails_get_stimulus(detail:\"summary\")` → `(controller:\"name\")` — targets, actions, values",
           "- `rails_get_test_info(detail:\"full\")` — fixtures, factories, helpers; `(model:\"Cook\")` — tests",
           "- `rails_get_edit_context(file:\"path\", near:\"keyword\")` — surgical edit context with line numbers",
+          "- `rails_analyze_feature(feature:\"auth\")` — schema + models + controllers + routes for a feature",
           "- `rails_validate(files:[...])` — batch syntax check for Ruby, ERB, JS",
           "- `rails_get_config` | `rails_get_gems` | `rails_get_conventions` | `rails_search_code`",
           ""

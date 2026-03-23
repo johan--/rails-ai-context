@@ -7,6 +7,7 @@ module RailsAiContext
     # In :full mode, delegates to MarkdownSerializer with Copilot header.
     class CopilotSerializer
       include TestCommandDetection
+      include StackOverviewHelper
 
       attr_reader :context
 
@@ -43,6 +44,8 @@ module RailsAiContext
         if routes && !routes[:error]
           lines << "- Routes: #{routes[:total_routes]} across #{(routes[:by_controller] || {}).size} controllers"
         end
+
+        lines.concat(full_preset_stack_lines)
 
         # Gems by category
         gems = context[:gems]

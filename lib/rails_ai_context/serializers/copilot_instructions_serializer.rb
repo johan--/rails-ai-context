@@ -5,6 +5,8 @@ module RailsAiContext
     # Generates .github/instructions/*.instructions.md files with applyTo frontmatter
     # for GitHub Copilot path-specific instructions.
     class CopilotInstructionsSerializer
+      include StackOverviewHelper
+
       attr_reader :context
 
       def initialize(context)
@@ -78,6 +80,8 @@ module RailsAiContext
           arch_labels = RailsAiContext::Tools::GetConventions::ARCH_LABELS rescue {}
           (conv[:architecture] || []).first(5).each { |p| lines << "- #{arch_labels[p] || p}" }
         end
+
+        lines.concat(full_preset_stack_lines)
 
         # List service objects
         begin
@@ -241,7 +245,7 @@ module RailsAiContext
           "applyTo: \"**/*\"",
           "---",
           "",
-          "# Rails MCP Tools (13) — Use These First",
+          "# Rails MCP Tools (14) — Use These First",
           "",
           "Use MCP for reference files (schema, routes, tests). Read directly if you'll edit.",
           "MCP tools return line numbers for surgical edits.",
@@ -254,6 +258,7 @@ module RailsAiContext
           "- `rails_get_view(controller:\"cooks\")` — view list; `(path:\"cooks/index.html.erb\")` — content",
           "- `rails_get_stimulus(detail:\"summary\")` → `(controller:\"name\")` — targets, actions, values",
           "- `rails_get_test_info(detail:\"full\")` — fixtures, factories, helpers; `(model:\"Cook\")` — existing tests",
+          "- `rails_analyze_feature(feature:\"auth\")` — schema + models + controllers + routes for a feature",
           "- `rails_get_config` | `rails_get_gems` | `rails_get_conventions` | `rails_search_code`",
           "- `rails_get_edit_context(file:\"path\", near:\"keyword\")` — surgical edit context with line numbers",
           "- `rails_validate(files:[\"path\"])` — validate Ruby, ERB, JS syntax in one call",
