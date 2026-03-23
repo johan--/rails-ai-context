@@ -252,7 +252,7 @@ rails ai:context:claude           # Use this instead (no quoting needed)
 
 ## MCP Tools — Full Reference
 
-All 14 tools are **read-only** and **idempotent** — they never modify your application or database.
+All 15 tools are **read-only** and **idempotent** — they never modify your application or database.
 
 ### rails_get_schema
 
@@ -590,7 +590,7 @@ rails_search_code(pattern: "validates", context_lines: 2)
 
 ### rails_analyze_feature
 
-Analyzes a feature end-to-end: finds matching models, controllers, routes, and views in one call.
+Full-stack feature analysis: models, controllers, routes, services, jobs, views, Stimulus controllers, tests, related models, concerns, callbacks, channels, mailers, and environment dependencies in one call.
 
 **Parameters:**
 
@@ -616,7 +616,34 @@ rails_analyze_feature(feature: "orders")
   → Everything related to orders across all layers
 ```
 
-**Returns:** Markdown with sections for Models (with table, columns, indexes, FKs, associations, validations, scopes), Controllers (with actions and filters), and Routes (with verbs, paths, and route names). Each section shows match counts.
+**Returns:** Markdown with sections for Models (with columns, associations, validations, scopes, enums), Controllers (with actions and filters), Routes, Services (with methods), Jobs (with queue/retry), Views (with partials and Stimulus refs), Stimulus controllers (with targets/values/actions), Tests (with counts), Related models, Concerns, Callbacks, Channels, Mailers, and Environment dependencies. Each section shows match counts.
+
+### rails_get_design_system
+
+Returns the app's design system: color palette with semantic roles, component patterns with real HTML examples from actual views, typography scale, layout conventions, responsive breakpoints, and interactive state patterns.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `detail` | string | `summary` (palette + components), `standard` (+ canonical page examples + design rules, default), `full` (+ typography, responsive, dark mode, animations, design tokens) |
+
+**Examples:**
+
+```
+rails_get_design_system()
+  → Color palette (primary, danger, success), component patterns (buttons, cards, inputs),
+    canonical page examples (form page, list page), design rules
+
+rails_get_design_system(detail: "summary")
+  → Compact: color roles + component class strings only
+
+rails_get_design_system(detail: "full")
+  → Everything: + typography scale, responsive breakpoints, interactive states,
+    dark mode patterns, animations, icon system, design tokens, shared partials
+```
+
+**Returns:** Structured design system reference. Includes real HTML/ERB snippets from the app's actual views as canonical examples, semantic color roles (primary for CTAs, danger for destructive), component variants, typography hierarchy, spacing scale, and explicit design rules for AI to follow.
 
 ### Detail Level Summary
 
@@ -746,7 +773,7 @@ RailsAiContext.configure do |config|
 end
 ```
 
-Both transports are **read-only** — they expose the same 14 tools and never modify your app.
+Both transports are **read-only** — they expose the same 15 tools and never modify your app.
 
 ---
 
