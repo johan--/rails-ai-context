@@ -127,7 +127,19 @@ module RailsAiContext
         stack << "Turbo" if content.include?("@hotwired/turbo")
         stack << "Stimulus" if content.include?("@hotwired/stimulus")
 
+        # Package manager
+        pm = detect_package_manager
+        stack << "#{pm} (package manager)" if pm
+
         stack
+      end
+
+      private_class_method def self.detect_package_manager
+        return "pnpm" if File.exist?(Rails.root.join("pnpm-lock.yaml"))
+        return "yarn" if File.exist?(Rails.root.join("yarn.lock"))
+        return "bun" if File.exist?(Rails.root.join("bun.lockb"))
+        return "npm" if File.exist?(Rails.root.join("package-lock.json"))
+        nil
       end
     end
   end

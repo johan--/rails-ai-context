@@ -58,7 +58,8 @@ module RailsAiContext
               lines << "" << "## #{current_cat.capitalize}"
             end
             config_hint = GEM_CONFIG_HINTS[g[:name]]
-            line = "- **#{g[:name]}**: #{g[:note]}"
+            version_str = g[:version] ? " `#{g[:version]}`" : ""
+            line = "- **#{g[:name]}**#{version_str}: #{g[:note]}"
             line += " _(config: #{config_hint})_" if config_hint
             lines << line
           end

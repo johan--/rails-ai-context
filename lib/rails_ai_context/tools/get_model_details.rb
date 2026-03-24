@@ -130,6 +130,7 @@ module RailsAiContext
             detail += " [polymorphic]" if a[:polymorphic]
             detail += " [optional]" if a[:optional]
             detail += " dependent: #{a[:dependent]}" if a[:dependent]
+            detail += " (fk: #{a[:foreign_key]})" if a[:foreign_key] && a[:type] == "belongs_to"
             lines << detail
           end
         end
@@ -210,6 +211,43 @@ module RailsAiContext
           lines << "" << "## Callbacks"
           data[:callbacks].each do |type, methods|
             lines << "- `#{type}`: #{methods.join(', ')}"
+          end
+        end
+
+        # Macros — surface hidden introspector data
+        macro_lines = []
+        macro_lines << "- `has_secure_password`" if data[:has_secure_password]
+        macro_lines << "- `encrypts` #{data[:encrypts].map { |f| ":#{f}" }.join(', ')}" if data[:encrypts]&.any?
+        macro_lines << "- `normalizes` #{data[:normalizes].map { |f| ":#{f}" }.join(', ')}" if data[:normalizes]&.any?
+        macro_lines << "- `generates_token_for` #{data[:generates_token_for].map { |f| ":#{f}" }.join(', ')}" if data[:generates_token_for]&.any?
+        macro_lines << "- `serialize` #{data[:serialize].map { |f| ":#{f}" }.join(', ')}" if data[:serialize]&.any?
+        macro_lines << "- `store` #{data[:store].map { |f| ":#{f}" }.join(', ')}" if data[:store]&.any?
+        macro_lines << "- `broadcasts` #{data[:broadcasts].join(', ')}" if data[:broadcasts]&.any?
+        if data[:has_one_attached]&.any?
+          macro_lines << "- `has_one_attached` #{data[:has_one_attached].map { |f| ":#{f}" }.join(', ')}"
+        end
+        if data[:has_many_attached]&.any?
+          macro_lines << "- `has_many_attached` #{data[:has_many_attached].map { |f| ":#{f}" }.join(', ')}"
+        end
+        if macro_lines.any?
+          lines << "" << "## Macros"
+          lines.concat(macro_lines)
+        end
+
+        # Delegations
+        if data[:delegations]&.any?
+          lines << "" << "## Delegations"
+          data[:delegations].each do |d|
+            lines << "- delegate #{d[:methods].map { |m| ":#{m}" }.join(', ')} to: :#{d[:to]}"
+          end
+        end
+        lines << "- `delegate_missing_to` :#{data[:delegate_missing_to]}" if data[:delegate_missing_to]
+
+        # Constants with value lists
+        if data[:constants]&.any?
+          lines << "" << "## Constants"
+          data[:constants].each do |c|
+            lines << "- `#{c[:name]}` = #{c[:values].join(', ')}"
           end
         end
 

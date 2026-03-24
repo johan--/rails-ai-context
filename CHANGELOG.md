@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stimulus lifecycle detection** — `get_stimulus` detects connect/disconnect/initialize lifecycle methods.
 - **Route params inline** — `get_routes` standard detail shows required params: `[id]`, `[user_id, id]`.
 - **Feature test coverage gaps** — `analyze_feature` reports which models/controllers/jobs lack test files.
+- **Model macros surfaced** — `get_model_details` now shows `has_secure_password`, `encrypts`, `normalizes`, `generates_token_for`, `serialize`, `store`, `broadcasts`, attachments — all previously collected but hidden.
+- **Model delegations and constants** — `get_model_details` shows `delegate :x, to: :y` and constants like `STATUSES = %w[pending completed]`.
+- **Association FK column hints** — `get_model_details` shows `(fk: user_id)` on belongs_to associations.
+- **Schema model references** — `get_schema` full detail shows which ActiveRecord models reference each table.
+- **Schema column comments** — `get_schema` full detail shows database column comments when present.
+- **Action Cable adapter detection** — `get_config` detects Action Cable adapter from cable.yml.
+- **Gem version display** — `get_gems` shows version numbers from Gemfile.lock.
+- **Package manager detection** — `get_conventions` detects npm/yarn/pnpm/bun from lock files.
+- **Exact match search** — `search_code` supports `exact_match:true` for whole-word matching with `\b` boundaries.
 
 ### Fixed
 

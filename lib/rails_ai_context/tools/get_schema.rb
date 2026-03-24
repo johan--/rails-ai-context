@@ -148,18 +148,31 @@ module RailsAiContext
         end
       end
 
+      private_class_method def self.models_for_table(table_name)
+        models = cached_context[:models]
+        return [] unless models.is_a?(Hash)
+
+        models.select { |_, d| d.is_a?(Hash) && d[:table_name] == table_name }.keys
+      rescue
+        []
+      end
+
       private_class_method def self.format_table_markdown(name, data)
         columns = data[:columns] || []
         # Always show Nullable and Default — agents need these for migrations and validations
         has_defaults = columns.any? { |c| c.key?(:default) && !c[:default].nil? }
 
+        model_refs = models_for_table(name)
         lines = [ "## Table: #{name}", "" ]
+        lines << "**Models:** #{model_refs.join(', ')}" if model_refs.any?
 
         header = "| Column | Type | Null"
         sep = "|--------|------|-----"
         header += " | Default" if has_defaults
         sep += "-|---------" if has_defaults
         lines << "#{header} |" << "#{sep}|"
+
+        has_comments = columns.any? { |c| c[:comment] && !c[:comment].to_s.empty? }
 
         columns.each do |col|
           nullable = col.key?(:null) ? (col[:null] ? "yes" : "**NO**") : "yes"
@@ -171,6 +184,7 @@ module RailsAiContext
             line += " | #{display_default}"
           end
           lines << "#{line} |"
+          lines << "  _#{col[:comment]}_" if has_comments && col[:comment] && !col[:comment].to_s.empty?
         end
 
         if data[:indexes]&.any?

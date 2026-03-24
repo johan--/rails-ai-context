@@ -33,6 +33,10 @@ module RailsAiContext
             enum: %w[any definition class],
             description: "Filter match type. any: all matches (default). definition: only `def method_name` lines. class: only `class/module Name` lines."
           },
+          exact_match: {
+            type: "boolean",
+            description: "Match whole words only (wraps pattern in \\b word boundaries). Default: false."
+          },
           max_results: {
             type: "integer",
             description: "Maximum number of results. Default: 30, max: 100."
@@ -47,13 +51,16 @@ module RailsAiContext
 
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
 
-      def self.call(pattern:, path: nil, file_type: nil, match_type: "any", max_results: 30, context_lines: 2, server_context: nil)
+      def self.call(pattern:, path: nil, file_type: nil, match_type: "any", exact_match: false, max_results: 30, context_lines: 2, server_context: nil)
         root = Rails.root.to_s
 
         # Reject empty or whitespace-only patterns
         if pattern.nil? || pattern.strip.empty?
           return text_response("Pattern is required. Provide a search term or regex.")
         end
+
+        # Apply exact_match word boundaries
+        pattern = "\\b#{pattern}\\b" if exact_match
 
         # Apply match_type filter to pattern
         pattern = case match_type

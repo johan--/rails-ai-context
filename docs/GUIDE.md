@@ -565,6 +565,7 @@ Ripgrep-powered regex search across the codebase.
 | `path` | string | Subdirectory to search in (e.g. `app/models`, `config`). Default: entire app. |
 | `file_type` | string | Filter by file type (e.g. `rb`, `erb`, `js`). Alphanumeric only. |
 | `match_type` | string | Filter matches: `any` (default), `definition` (only `def` lines), `class` (only `class`/`module` lines). |
+| `exact_match` | boolean | Match whole words only (wraps pattern in `\b` boundaries). Default: false. |
 | `max_results` | integer | Max results to return. Default: 30, max: 100. |
 | `context_lines` | integer | Lines of context before and after each match (like grep -C). Default: 2, max: 5. |
 

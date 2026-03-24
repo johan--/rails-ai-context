@@ -31,6 +31,10 @@ module RailsAiContext
         assets = detect_assets_stack
         lines << "- **Assets:** #{assets}" if assets
 
+        # Action Cable
+        cable = detect_action_cable
+        lines << "- **Action Cable:** #{cable}" if cable
+
         lines << "- **Cache store:** #{data[:cache_store]}" if data[:cache_store]
         lines << "- **Session store:** #{data[:session_store]}" if data[:session_store]
         lines << "- **Timezone:** #{data[:timezone]}" if data[:timezone]
@@ -122,6 +126,17 @@ module RailsAiContext
         parts << "Import Maps" if File.exist?(Rails.root.join("config/importmap.rb"))
 
         parts.any? ? parts.join(", ") : nil
+      end
+
+      private_class_method def self.detect_action_cable
+        cable_config = Rails.root.join("config/cable.yml")
+        return nil unless File.exist?(cable_config)
+
+        content = File.read(cable_config) rescue nil
+        return nil unless content
+
+        adapter = content.match(/adapter:\s*(\w+)/)&.captures&.first
+        adapter || "configured"
       end
     end
   end

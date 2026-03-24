@@ -22,6 +22,8 @@ module RailsAiContext
       check_introspector_health
       check_preset_coverage
       check_ripgrep
+      check_prism
+      check_brakeman
       check_live_reload
       check_security_gitignore
       check_security_auto_mount
@@ -269,6 +271,24 @@ module RailsAiContext
           message: "ripgrep not installed (slower Ruby fallback)",
           fix: "Install: `brew install ripgrep` or `apt install ripgrep`")
       end
+    end
+
+    def check_prism
+      require "prism"
+      Check.new(name: "Prism parser", status: :pass, message: "Prism available for AST-based validation", fix: nil)
+    rescue LoadError
+      Check.new(name: "Prism parser", status: :warn,
+        message: "Prism not installed (validation falls back to subprocess, semantic checks limited)",
+        fix: "Add: `gem 'prism'` (included in Ruby 3.3+)")
+    end
+
+    def check_brakeman
+      require "brakeman"
+      Check.new(name: "Brakeman", status: :pass, message: "Brakeman available for security scanning", fix: nil)
+    rescue LoadError
+      Check.new(name: "Brakeman", status: :warn,
+        message: "Brakeman not installed (rails_security_scan tool will return install instructions)",
+        fix: "Add: `gem 'brakeman', group: :development`")
     end
 
     def check_live_reload
