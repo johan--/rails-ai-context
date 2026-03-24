@@ -251,8 +251,10 @@ module RailsAiContext
 
         require "yaml"
         content = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-        # Handle ERB-templated fixtures by stripping ERB tags before parsing
-        content = content.gsub(/<%.*?%>/m, "\"erb\"")
+        # Handle ERB-templated fixtures: replace "<%=...%>" (with surrounding quotes) and bare <%...%>
+        content = content.gsub(/"<%=.*?%>"/, '"erb_value"')
+        content = content.gsub(/'<%=.*?%>'/, "'erb_value'")
+        content = content.gsub(/<%.*?%>/, "erb_value")
         parsed = YAML.safe_load(content, permitted_classes: [ Date, Time, Symbol ]) rescue nil
         return {} unless parsed.is_a?(Hash)
 
