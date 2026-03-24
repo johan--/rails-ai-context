@@ -681,6 +681,242 @@ rails_security_scan(detail: "full", checks: ["CheckSQL"])
 
 **Returns:** Security warnings grouped by type with file locations, confidence levels, and messages. Full detail includes offending code snippets, CWE identifiers, and links to Brakeman documentation for each warning type.
 
+### rails_get_concern
+
+Get ActiveSupport::Concern details: public methods, included modules, and which models/controllers include it. Specify a name for full detail, or omit to list all concerns. Filter by type to narrow to model or controller concerns.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `name` | string | Concern module name (e.g. `Searchable`, `Authenticatable`). Omit to list all concerns. |
+| `type` | string | Filter by concern type: `model`, `controller`, `all` (default). |
+
+**Examples:**
+
+```
+rails_get_concern()
+  → Lists all model and controller concerns with method counts
+
+rails_get_concern(name: "Searchable")
+  → Full detail: public methods, class methods, macros, callbacks, and which models include it
+
+rails_get_concern(type: "model")
+  → Lists only model concerns from app/models/concerns/
+```
+
+**Returns:** Concern listing or full detail including file path, line count, included/extended modules, macros and DSL usage, public methods, class methods, callbacks, and a list of models or controllers that include the concern. Cross-references to related model/controller tools.
+
+### rails_get_callbacks
+
+Get ActiveRecord model callbacks in execution order: before/after/around for validation, save, create, update, destroy. Specify a model for one model's callbacks, or omit to see all models with their callbacks.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `model` | string | Model class name (e.g. `User`, `Post`). Omit to see all models with their callbacks. |
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: model names + callback counts. standard: callbacks in execution order. full: callbacks with method source code. |
+
+**Examples:**
+
+```
+rails_get_callbacks(model: "User")
+  → User's callbacks in execution order: before_validation, after_validation, before_save, etc.
+
+rails_get_callbacks(detail: "summary")
+  → All models with callback counts, sorted by most callbacks
+
+rails_get_callbacks(model: "Order", detail: "full")
+  → Order's callbacks with the actual method source code for each callback
+```
+
+**Returns:** Callbacks organized in Rails execution order. Includes concern-provided callbacks. Full detail shows the Ruby source code of each callback method with line numbers.
+
+### rails_get_helper_methods
+
+Get Rails helper modules: method signatures, framework helpers in use, and which views call each helper. Specify a helper for full detail, or omit to list all helpers with method counts.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `helper` | string | Helper module name (e.g. `ApplicationHelper`, `UsersHelper`). Omit to list all helpers. |
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: names + method counts. standard: names + method signatures. full: method signatures + view cross-references + framework helpers. |
+
+**Examples:**
+
+```
+rails_get_helper_methods()
+  → All helpers with method signatures (standard detail)
+
+rails_get_helper_methods(helper: "ApplicationHelper")
+  → Full detail: method signatures, included modules
+
+rails_get_helper_methods(detail: "full")
+  → All helpers with method signatures + detected framework helpers (Devise, Pagy, Turbo, etc.)
+```
+
+**Returns:** Helper module listing or full detail including file path, method signatures, included modules, and (at full detail) which views reference each helper method. Detects usage of framework helpers from Devise, Pagy, Turbo, Pundit, CanCanCan, Kaminari, SimpleForm, and others.
+
+### rails_get_service_pattern
+
+Analyze service objects in app/services/: patterns, interfaces, dependencies, and side effects. Specify a service for full detail, or omit to detect the common pattern and list all services.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `service` | string | Service class name or filename (e.g. `CreateOrder`, `create_order`). Omit to list all services with pattern detection. |
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: names only. standard: names + method signatures + line counts. full: everything including side effects, error handling, and callers. |
+
+**Examples:**
+
+```
+rails_get_service_pattern()
+  → All services with detected common pattern (e.g. "initialize + call instance method")
+
+rails_get_service_pattern(service: "CreateOrder")
+  → Full detail: initialize params, public methods, dependencies, error handling, side effects, callers
+
+rails_get_service_pattern(detail: "full")
+  → All services with methods, initialize params, side effects, and rescue blocks
+```
+
+**Returns:** Service listing with common pattern detection (initialize+call, self.call, Result objects) or full detail including file path, initialize parameters, public methods, dependencies (other classes called), error handling (rescue blocks), side effects (database writes, email delivery, job enqueues, HTTP requests, Turbo broadcasts), and a list of files that call the service.
+
+### rails_get_job_pattern
+
+Analyze background jobs in app/jobs/: queues, retries, perform signatures, guards, and what they call. Specify a job for full detail, or omit to list all jobs with queue names and retry config.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `job` | string | Job class name or filename (e.g. `SendWelcomeEmailJob`, `send_welcome_email`). Omit to list all jobs. |
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: names + queues. standard: names + queues + retries + what they call. full: everything including guards, broadcasts, schedules, and enqueuers. |
+
+**Examples:**
+
+```
+rails_get_job_pattern()
+  → All jobs with queue summary and retry config
+
+rails_get_job_pattern(job: "SendWelcomeEmailJob")
+  → Full detail: queue, retry config, perform signature, guard clauses, dependencies, broadcasts, schedule, side effects, enqueuers
+
+rails_get_job_pattern(detail: "full")
+  → All jobs with guards, broadcasts, side effects, and schedules
+```
+
+**Returns:** Job listing with queue breakdown or full detail including queue name, retry/discard configuration (retry_on, discard_on, Sidekiq options), perform method signature, guard clauses (early returns), dependencies (classes called), Turbo broadcasts, cron/recurring schedule (from sidekiq.yml or config files), side effects, and a list of files that enqueue the job.
+
+### rails_get_env
+
+Discover environment variables, external service dependencies, and credentials keys used by the app. Scans Ruby files for ENV[], .env.example, Dockerfile, external HTTP calls, and credentials keys (never values).
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: env var names only. standard: env vars grouped by source + external services. full: everything including per-file locations, Dockerfile vars, and credentials keys. |
+
+**Examples:**
+
+```
+rails_get_env()
+  → Env vars grouped by purpose (Database, Redis, AWS, etc.) + external services + credentials keys
+
+rails_get_env(detail: "summary")
+  → Env var names grouped by category
+
+rails_get_env(detail: "full")
+  → Per-file env var locations with line numbers, .env.example contents, Dockerfile ENV/ARG, external services with detection method, credentials keys, encrypted columns
+```
+
+**Returns:** Environment variables grouped by purpose (Database, Redis, AWS, Payments, Email, Monitoring, API Keys, etc.) with default values where detected. External service dependencies discovered from Gemfile gems and HTTP client calls. Credentials keys (never values). Encrypted model columns. Full detail includes per-file locations with line numbers.
+
+### rails_get_partial_interface
+
+Analyze a partial's interface: local variables it expects, where it's rendered from, and what methods are called on each local. Use when rendering a partial, understanding what locals to pass, or refactoring partial dependencies.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `partial` | string | **Required.** Partial path relative to app/views (e.g. `shared/status_badge`, `users/form`). The leading underscore is optional. |
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: locals list + usage count. standard: locals + usage examples from codebase. full: locals + usage + full partial source. |
+
+**Examples:**
+
+```
+rails_get_partial_interface(partial: "shared/status_badge")
+  → Local variables, method calls on each local, and all render sites with locals passed
+
+rails_get_partial_interface(partial: "users/form", detail: "summary")
+  → Local variable names + number of render sites
+
+rails_get_partial_interface(partial: "shared/card", detail: "full")
+  → Full detail: locals, method calls, render sites with code snippets, and full partial source
+```
+
+**Returns:** Partial interface including declared locals (Rails 7.1+ magic comment), detected local variable references, method calls on each local, and render sites with file/line and locals passed. Supports underscore-prefixed and non-prefixed names. Full detail includes the complete partial source code.
+
+### rails_get_turbo_map
+
+Map Turbo Streams and Frames across the app: model broadcasts, channel subscriptions, frame tags, and DOM target mismatches. Filter by stream or controller name.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `detail` | string | `summary` / `standard` (default) / `full`. summary: count of streams, frames, model broadcasts. standard: each stream with source to target. full: everything including inline template refs and DOM IDs. |
+| `stream` | string | Filter by stream/channel name (e.g. `notifications`, `messages`). Shows only broadcasts and subscriptions for this stream. |
+| `controller` | string | Filter by controller name (e.g. `messages`, `comments`). Shows Turbo usage in that controller's views and actions. |
+
+**Examples:**
+
+```
+rails_get_turbo_map()
+  → Model broadcasts, explicit broadcasts, stream subscriptions, Turbo Frames, and mismatch warnings
+
+rails_get_turbo_map(stream: "notifications")
+  → Only broadcasts and subscriptions for the "notifications" stream
+
+rails_get_turbo_map(controller: "messages", detail: "full")
+  → Full Turbo usage in messages controller with DOM IDs, stream wiring map, and mismatch warnings
+```
+
+**Returns:** Turbo Streams and Frames mapped across the app. Model broadcasts (via `broadcasts`, `broadcasts_to`, `broadcasts_refreshes`), explicit broadcasts (`broadcast_replace_to`, `broadcast_append_to`, etc.), stream subscriptions (`turbo_stream_from` in views), and Turbo Frames (`turbo_frame_tag` with IDs and src). Full detail includes a stream wiring map connecting broadcasters to subscribers, and warnings for broadcasts without subscribers or subscriptions without broadcasters.
+
+### rails_get_context
+
+Get cross-layer context in a single call — combines schema, model, controller, routes, views, stimulus, and tests. Use when you need full context for implementing a feature or modifying an action.
+
+**Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `controller` | string | Controller name (e.g. `CooksController`). Returns action source, filters, strong params, routes, views. |
+| `action` | string | Specific action name (e.g. `create`). Requires controller. Returns full action context. |
+| `model` | string | Model name (e.g. `Cook`). Returns schema, associations, validations, scopes, callbacks, tests. |
+| `feature` | string | Feature keyword (e.g. `cook`). Like analyze_feature but includes schema columns and scope bodies. |
+
+**Examples:**
+
+```
+rails_get_context(controller: "CooksController", action: "create")
+  → Controller action source + model details + routes + views — everything for that action
+
+rails_get_context(model: "User")
+  → Model details + schema columns + test file content
+
+rails_get_context(feature: "orders")
+  → Full-stack feature analysis including schema columns and scope bodies
+```
+
+**Returns:** Combined context from multiple tools in a single response. For controller+action: controller source with filters, inferred model details, matching routes, and view templates. For model: model details with associations/validations/scopes, schema columns with types, and test file content. For feature: delegates to full-stack feature analysis.
+
 ### Detail Level Summary
 
 All tools that support `detail` use these three levels. Default limits vary by tool — schema defaults shown below:
@@ -840,10 +1076,10 @@ RailsAiContext.configure do |config|
   # --- MCP tools ---
 
   # Max response size for tool results (safety net)
-  config.max_tool_response_chars = 120_000
+  config.max_tool_response_chars = 200_000
 
   # Cache TTL for introspection results (seconds)
-  config.cache_ttl = 30
+  config.cache_ttl = 60
 
   # Additional MCP tool classes to register alongside built-in tools
   # config.custom_tools = [MyApp::Tools::CustomTool]
@@ -879,26 +1115,26 @@ RailsAiContext.configure do |config|
 
   # --- File size limits ---
 
-  # Per-file read limit for tools (default: 2MB)
-  # config.max_file_size = 2_000_000
+  # Per-file read limit for tools (default: 5MB)
+  # config.max_file_size = 5_000_000
 
-  # Test file read limit (default: 500KB)
-  # config.max_test_file_size = 500_000
+  # Test file read limit (default: 1MB)
+  # config.max_test_file_size = 1_000_000
 
   # schema.rb / structure.sql parse limit (default: 10MB)
   # config.max_schema_file_size = 10_000_000
 
-  # Total aggregated view content for UI patterns (default: 5MB)
-  # config.max_view_total_size = 5_000_000
+  # Total aggregated view content for UI patterns (default: 10MB)
+  # config.max_view_total_size = 10_000_000
 
-  # Per-view file during aggregation (default: 500KB)
-  # config.max_view_file_size = 500_000
+  # Per-view file during aggregation (default: 1MB)
+  # config.max_view_file_size = 1_000_000
 
-  # Max search results per call (default: 100)
-  # config.max_search_results = 100
+  # Max search results per call (default: 200)
+  # config.max_search_results = 200
 
-  # Max files per validate call (default: 20)
-  # config.max_validate_files = 20
+  # Max files per validate call (default: 50)
+  # config.max_validate_files = 50
 
   # --- Search and file discovery ---
 
@@ -952,13 +1188,13 @@ end
 | `server_name` | String | `"rails-ai-context"` | MCP server name |
 | `server_version` | String | gem version | MCP server version |
 | `generate_root_files` | Boolean | `true` | Generate root files (CLAUDE.md, .windsurfrules, etc.) — set `false` for split rules only |
-| `max_file_size` | Integer | `2_000_000` | Per-file read limit for tools (2MB) |
-| `max_test_file_size` | Integer | `500_000` | Test file read limit (500KB) |
+| `max_file_size` | Integer | `5_000_000` | Per-file read limit for tools (5MB) |
+| `max_test_file_size` | Integer | `1_000_000` | Test file read limit (1MB) |
 | `max_schema_file_size` | Integer | `10_000_000` | schema.rb / structure.sql parse limit (10MB) |
-| `max_view_total_size` | Integer | `5_000_000` | Total aggregated view content for UI patterns (5MB) |
-| `max_view_file_size` | Integer | `500_000` | Per-view file during aggregation (500KB) |
-| `max_search_results` | Integer | `100` | Max search results per call |
-| `max_validate_files` | Integer | `20` | Max files per validate call |
+| `max_view_total_size` | Integer | `10_000_000` | Total aggregated view content for UI patterns (10MB) |
+| `max_view_file_size` | Integer | `1_000_000` | Per-view file during aggregation (1MB) |
+| `max_search_results` | Integer | `200` | Max search results per call |
+| `max_validate_files` | Integer | `50` | Max files per validate call |
 | `excluded_controllers` | Array | `DeviseController`, etc. | Controller classes hidden from listings |
 | `excluded_route_prefixes` | Array | `action_mailbox/`, `active_storage/`, etc. | Route controller prefixes hidden with `app_only` |
 | `excluded_concerns` | Array | framework regex patterns | Regex patterns for concerns to hide from model output |

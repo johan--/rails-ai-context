@@ -182,6 +182,16 @@ module RailsAiContext
           "- `rails_get_design_system` — color palette, component patterns, canonical page examples",
           "- `rails_validate(files:[...])` — batch syntax check for Ruby, ERB, JS",
           "- `rails_get_config` | `rails_get_gems` | `rails_get_conventions` | `rails_search_code`",
+          "- `rails_security_scan` — Brakeman security analysis",
+          "- `rails_get_concern(name:\"Searchable\")` — concern methods and includers",
+          "- `rails_get_callbacks(model:\"User\")` — model callbacks in execution order",
+          "- `rails_get_helper_methods` — app + framework helpers",
+          "- `rails_get_service_pattern` — service object patterns and interfaces",
+          "- `rails_get_job_pattern` — background job patterns and schedules",
+          "- `rails_get_env` — environment variables and credentials keys",
+          "- `rails_get_partial_interface(path:\"shared/_form\")` — partial locals contract",
+          "- `rails_get_turbo_map` — Turbo Streams/Frames wiring",
+          "- `rails_get_context(model:\"User\")` — composite cross-layer context",
           ""
         ]
       end

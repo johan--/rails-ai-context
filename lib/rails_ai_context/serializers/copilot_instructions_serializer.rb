@@ -237,6 +237,16 @@ module RailsAiContext
           "- `rails_get_config` | `rails_get_gems` | `rails_get_conventions` | `rails_search_code`",
           "- `rails_get_edit_context(file:\"path\", near:\"keyword\")` — surgical edit context with line numbers",
           "- `rails_validate(files:[\"path\"])` — validate Ruby, ERB, JS syntax in one call",
+          "- `rails_security_scan` — Brakeman security analysis",
+          "- `rails_get_concern(name:\"Searchable\")` — concern methods and includers",
+          "- `rails_get_callbacks(model:\"User\")` — model callbacks in execution order",
+          "- `rails_get_helper_methods` — app + framework helpers",
+          "- `rails_get_service_pattern` — service object patterns and interfaces",
+          "- `rails_get_job_pattern` — background job patterns and schedules",
+          "- `rails_get_env` — environment variables and credentials keys",
+          "- `rails_get_partial_interface(path:\"shared/_form\")` — partial locals contract",
+          "- `rails_get_turbo_map` — Turbo Streams/Frames wiring",
+          "- `rails_get_context(model:\"User\")` — composite cross-layer context",
           "",
           "After editing: use rails_validate to check syntax. Do NOT re-read files to verify."
         ]
