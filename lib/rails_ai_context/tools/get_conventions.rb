@@ -46,6 +46,13 @@ module RailsAiContext
           frontend.each { |f| lines << "- #{f}" }
         end
 
+        # App-specific patterns detected from controller source
+        app_patterns = detect_app_patterns
+        if app_patterns.any?
+          lines << "" << "## App Patterns"
+          app_patterns.each { |section| lines << section }
+        end
+
         # Config files — only show non-obvious ones (skip files every Rails app has)
         if conventions[:config_files]&.any?
           obvious = %w[
@@ -140,6 +147,111 @@ module RailsAiContext
         return "bun" if File.exist?(Rails.root.join("bun.lockb"))
         return "npm" if File.exist?(Rails.root.join("package-lock.json"))
         nil
+      end
+
+      # Scan controllers for app-specific authorization, flash, and error-handling patterns
+      private_class_method def self.detect_app_patterns
+        controllers_dir = Rails.root.join("app", "controllers")
+        return [] unless Dir.exist?(controllers_dir)
+
+        auth_checks = []
+        auth_denials = []
+        flash_notices = []
+        flash_alerts = []
+        not_found_patterns = []
+        create_flows = []
+        has_services = Dir.exist?(Rails.root.join("app", "services"))
+
+        Dir.glob(File.join(controllers_dir, "**", "*.rb")).each do |path|
+          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          controller_name = File.basename(path, ".rb")
+
+          # Authorization: can_*? method calls with redirect + alert
+          content.scan(/\b(can_\w+\??)/).each do |match|
+            auth_checks << match[0] unless auth_checks.include?(match[0])
+          end
+
+          # Authorization denials: redirect_to ... alert: "..."
+          content.scan(/redirect_to\s+.+?,\s*alert:\s*["']([^"']+)["']/).each do |match|
+            denial = "redirect_to ..., alert: \"#{match[0]}\""
+            auth_denials << denial unless auth_denials.include?(denial)
+          end
+
+          # Flash notices: redirect_to ... notice: "..."
+          content.scan(/(?:notice:\s*["']([^"']+)["'])/).each do |match|
+            flash_notices << match[0] unless flash_notices.include?(match[0])
+          end
+
+          # Flash alerts: redirect_to ... alert: "..." or flash[:alert]
+          content.scan(/(?:alert:\s*["']([^"']+)["'])/).each do |match|
+            flash_alerts << match[0] unless flash_alerts.include?(match[0])
+          end
+
+          # Not-found handling: set_* methods that rescue or redirect on missing records
+          content.scan(/def\s+(set_\w+).*?(?=\n\s*def\s|\n\s*end\s*\z)/m).each do |match_data|
+            method_name = match_data[0]
+            # Look for the block around this method for rescue/redirect
+            if content.match?(/def\s+#{Regexp.escape(method_name)}.*?(?:rescue\s+ActiveRecord::RecordNotFound|rescue\b)/m)
+              redirect_match = content.match(/def\s+#{Regexp.escape(method_name)}.*?redirect_to\s+(\S+)/m)
+              target = redirect_match ? redirect_match[1].sub(/,.*/, "") : "..."
+              not_found_patterns << "#{method_name} → rescue → redirect_to #{target}" unless not_found_patterns.include?("#{method_name} → rescue → redirect_to #{target}")
+            end
+          end
+
+          # Create action flow detection
+          if content.match?(/def\s+create\b/)
+            create_block = content[/def\s+create\b.*?(?=\n\s{2}def\s|\n\s{2}private|\z)/m]
+            if create_block
+              flow_parts = []
+              flow_parts << "permission check" if create_block.match?(/can_\w+\??|authorize|authorize!/)
+              flow_parts << "build" if create_block.match?(/\.new\(|\.build\(|\.create\(/)
+              flow_parts << "save" if create_block.match?(/\.save\b|\.create\b/)
+              flow_parts << "redirect/render" if create_block.match?(/redirect_to|render\b/)
+              if flow_parts.size >= 2
+                create_flows << "#{controller_name.camelize}: #{flow_parts.join(' → ')}"
+              end
+            end
+          end
+        end
+
+        sections = []
+
+        if auth_checks.any? || auth_denials.any?
+          sections << "" << "### Authorization"
+          auth_checks.first(5).each { |c| sections << "- Check: `#{c}`" }
+          auth_denials.first(5).each { |d| sections << "- Deny: #{d}" }
+        end
+
+        if flash_notices.any? || flash_alerts.any?
+          sections << "" << "### Flash Messages"
+          flash_notices.first(5).each { |n| sections << "- Success: notice: \"#{n}\"" }
+          flash_alerts.first(5).each { |a| sections << "- Failure: alert: \"#{a}\"" }
+        end
+
+        if not_found_patterns.any?
+          sections << "" << "### Error Handling"
+          not_found_patterns.first(5).each { |p| sections << "- Not found: #{p}" }
+        end
+
+        if create_flows.any?
+          sections << "" << "### Create Action Flows"
+          create_flows.first(10).each { |f| sections << "- #{f}" }
+        end
+
+        if has_services
+          service_files = Dir.glob(Rails.root.join("app", "services", "**", "*.rb"))
+          if service_files.any?
+            sections << "" << "### Service Objects"
+            service_files.first(10).each do |sf|
+              rel = sf.sub("#{Rails.root}/", "")
+              sections << "- `#{rel}`"
+            end
+          end
+        end
+
+        sections
+      rescue => e
+        [] # Graceful degradation — never break the tool
       end
     end
   end

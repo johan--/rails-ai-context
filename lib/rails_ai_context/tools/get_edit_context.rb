@@ -84,7 +84,12 @@ module RailsAiContext
         # If match is inside a method, expand to include the full method
         method_start = find_method_start(source_lines, match_idx)
         method_end = find_method_end(source_lines, method_start) if method_start
-        if method_start && method_end
+        if method_start && method_end && source_lines[match_idx].match?(/\A\s*def\s/)
+          # Match IS a method definition — show the complete method, no extra context
+          start_idx = method_start
+          end_idx = method_end
+        elsif method_start && method_end
+          # Match is inside a method — expand to include full method + context
           start_idx = [ start_idx, method_start ].min
           end_idx = [ end_idx, method_end ].max
         end

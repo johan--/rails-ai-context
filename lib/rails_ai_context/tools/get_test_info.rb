@@ -86,8 +86,29 @@ module RailsAiContext
 
           if data[:fixture_names]&.any?
             lines << "" << "## Fixtures"
-            data[:fixture_names].each do |file, names|
-              lines << "- **#{file}:** #{names.join(', ')}"
+            parsed_fixtures = parse_all_fixture_contents
+            if parsed_fixtures.any?
+              parsed_fixtures.each do |file, entries|
+                lines << "- **#{file}:**"
+                entries.each do |entry_name, attrs|
+                  attr_str = attrs.map { |k, v| "#{k}: #{v}" }.join(", ")
+                  lines << "  - `#{entry_name}`: #{attr_str}"
+                end
+              end
+
+              # Fixture relationships section
+              relationships = extract_fixture_relationships(parsed_fixtures)
+              if relationships.any?
+                lines << "" << "## Fixture Relationships"
+                relationships.each do |parent, children|
+                  lines << "- **#{parent}** ← #{children.join(', ')}"
+                end
+              end
+            else
+              # Fallback to simple names if parsing fails
+              data[:fixture_names].each do |file, names|
+                lines << "- **#{file}:** #{names.join(', ')}"
+              end
             end
           end
 
@@ -221,6 +242,99 @@ module RailsAiContext
         lines.any? ? lines.join("\n") : nil
       rescue
         nil
+      end
+
+      # Parse a single fixture YAML file, returning a hash of entry_name => filtered attributes
+      private_class_method def self.parse_fixture_contents(file_path)
+        return {} unless File.exist?(file_path)
+        return {} if File.size(file_path) > max_test_file_size
+
+        require "yaml"
+        content = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        # Handle ERB-templated fixtures by stripping ERB tags before parsing
+        content = content.gsub(/<%.*?%>/m, "\"erb\"")
+        parsed = YAML.safe_load(content, permitted_classes: [ Date, Time, Symbol ]) rescue nil
+        return {} unless parsed.is_a?(Hash)
+
+        skip_keys = %w[created_at updated_at id]
+        entries = {}
+
+        parsed.each do |entry_name, attributes|
+          next unless attributes.is_a?(Hash)
+          filtered = {}
+          attributes.each do |key, value|
+            next if skip_keys.include?(key.to_s)
+            str_value = value.to_s
+            next if str_value.length > 100
+            filtered[key] = value
+          end
+          entries[entry_name] = filtered if filtered.any?
+        end
+
+        entries
+      rescue => e
+        {}
+      end
+
+      # Parse all fixture files, returning { "fixture_file" => { entry => attrs } }
+      private_class_method def self.parse_all_fixture_contents
+        fixture_dirs = [
+          Rails.root.join("test", "fixtures"),
+          Rails.root.join("spec", "fixtures")
+        ]
+
+        results = {}
+        fixture_dirs.each do |dir|
+          next unless Dir.exist?(dir)
+          Dir.glob(File.join(dir, "**", "*.yml")).sort.each do |path|
+            rel_name = File.basename(path, ".yml")
+            entries = parse_fixture_contents(path)
+            results[rel_name] = entries if entries.any?
+          end
+        end
+
+        results
+      rescue => e
+        {}
+      end
+
+      # Extract relationships: find foreign key references between fixtures
+      # Returns { "parent_fixture (entry)" => ["child_fixture.entry", ...] }
+      private_class_method def self.extract_fixture_relationships(parsed_fixtures)
+        # Build a set of all fixture entry names by file for lookup
+        entry_lookup = {}
+        parsed_fixtures.each do |file, entries|
+          entries.each_key { |name| entry_lookup[name] = file }
+        end
+
+        relationships = Hash.new { |h, k| h[k] = [] }
+
+        parsed_fixtures.each do |file, entries|
+          entries.each do |entry_name, attrs|
+            attrs.each do |key, value|
+              # Foreign key pattern: key ends with _id and value matches an entry, or
+              # key matches a fixture file name and value is a fixture entry reference
+              str_value = value.to_s
+              if key.to_s.end_with?("_id") && entry_lookup[str_value]
+                parent_file = entry_lookup[str_value]
+                relationships["#{parent_file} (#{str_value})"] << "#{file}.#{entry_name}"
+              elsif parsed_fixtures.key?(key.to_s) && parsed_fixtures[key.to_s].key?(str_value)
+                # Rails fixture reference: e.g. user: chef_one where "user" is a fixture file
+                relationships["#{key} (#{str_value})"] << "#{file}.#{entry_name}"
+              elsif key.to_s =~ /\A(\w+)_id\z/
+                # Foreign key with integer value — note the relationship type
+                parent_table = $1.pluralize
+                if parsed_fixtures.key?(parent_table)
+                  relationships["#{parent_table} (id=#{str_value})"] << "#{file}.#{entry_name}"
+                end
+              end
+            end
+          end
+        end
+
+        relationships
+      rescue => e
+        {}
       end
     end
   end

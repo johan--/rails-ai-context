@@ -120,22 +120,130 @@ module RailsAiContext
           lines
         end
 
-        def render_components(components, detail)
+        def render_components(components, detail) # rubocop:disable Metrics
           lines = [ "## Components — Copy These Patterns", "" ]
 
           by_type = components.group_by { |c| c[:type] }
           by_type.each do |_type, comps|
             comps.each do |c|
-              lines << "**#{c[:label]}:** `#{c[:classes]}`"
-              if detail == "full" && c[:variants]&.any?
-                c[:variants].each do |v|
-                  lines << "  - variant: `#{v[:classes]}` (#{v[:count]}x)"
+              canonical_variant = find_canonical_variant(c)
+
+              case detail
+              when "summary"
+                # Just class strings (original behavior)
+                lines << "**#{c[:label]}:** `#{c[:classes]}`"
+
+              when "standard"
+                # Class strings + canonical HTML/ERB examples
+                lines << "**#{c[:label]}** (CANONICAL): `#{c[:classes]}`"
+                lines << ""
+                lines.concat(format_component_html(c[:label], c[:classes]))
+                lines << ""
+
+              when "full"
+                # Canonical + all variants used 2+ times
+                lines << "**#{c[:label]}** (CANONICAL): `#{c[:classes]}`"
+                lines << ""
+                lines.concat(format_component_html(c[:label], c[:classes]))
+                lines << ""
+
+                if c[:variants]&.any?
+                  significant_variants = c[:variants].select { |v| v[:count] && v[:count] >= 2 }
+                  significant_variants.each do |v|
+                    next if v[:classes] == canonical_variant
+
+                    lines << "  - variant: `#{v[:classes]}` (#{v[:count]}x)"
+                  end
                 end
               end
             end
           end
 
           lines << ""
+          lines
+        end
+
+        # Find the most-used variant's classes (the canonical one)
+        def find_canonical_variant(component)
+          return component[:classes] unless component[:variants]&.any?
+
+          best = component[:variants].max_by { |v| v[:count] || 0 }
+          best ? best[:classes] : component[:classes]
+        end
+
+        # Generate HTML/ERB examples based on the component type detected from the label
+        def format_component_html(label, classes) # rubocop:disable Metrics
+          downcased = label.downcase
+          lines = []
+
+          if downcased.match?(/button|btn/)
+            lines << "```html"
+            lines << "<button type=\"submit\" class=\"#{classes}\">Label</button>"
+            lines << "```"
+            lines << ""
+            lines << "```erb"
+            lines << "<%= link_to \"Label\", path, class: \"#{classes}\" %>"
+            lines << "<%= f.submit \"Save\", class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/textarea|text_area/)
+            lines << "```erb"
+            lines << "<%= f.text_area :field_name, class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/select/)
+            lines << "```erb"
+            lines << "<%= f.select :field_name, options, {}, class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/input|field/)
+            lines << "```erb"
+            lines << "<%= f.text_field :field_name, class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/card/)
+            lines << "```html"
+            lines << "<div class=\"#{classes}\">content</div>"
+            lines << "```"
+          elsif downcased.match?(/badge/)
+            lines << "```html"
+            lines << "<span class=\"#{classes}\">status</span>"
+            lines << "```"
+          elsif downcased.match?(/link/)
+            lines << "```erb"
+            lines << "<%= link_to \"Label\", path, class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/heading/)
+            tag = if downcased.include?("page") then "h1"
+            elsif downcased.include?("section") then "h2"
+            elsif downcased.include?("sub") then "h3"
+            else "h2"
+            end
+            lines << "```html"
+            lines << "<#{tag} class=\"#{classes}\">Title</#{tag}>"
+            lines << "```"
+          elsif downcased.match?(/label/)
+            lines << "```erb"
+            lines << "<%= f.label :field_name, class: \"#{classes}\" %>"
+            lines << "```"
+          elsif downcased.match?(/flash|alert/)
+            lines << "```html"
+            lines << "<div class=\"#{classes}\">message</div>"
+            lines << "```"
+          elsif downcased.match?(/modal|overlay/)
+            lines << "```html"
+            lines << "<div class=\"#{classes}\">content</div>"
+            lines << "```"
+          elsif downcased.match?(/list/)
+            lines << "```html"
+            lines << "<div class=\"#{classes}\">item</div>"
+            lines << "```"
+          elsif downcased.match?(/nav/)
+            lines << "```html"
+            lines << "<nav class=\"#{classes}\">links</nav>"
+            lines << "```"
+          else
+            lines << "```html"
+            lines << "<div class=\"#{classes}\">content</div>"
+            lines << "```"
+          end
+
           lines
         end
 

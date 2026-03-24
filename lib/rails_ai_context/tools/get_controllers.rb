@@ -173,7 +173,7 @@ module RailsAiContext
           return "Action '#{action_name}' not found in #{controller_name}. Available: #{actions.join(', ')}"
         end
 
-        # Find applicable filters
+        # Find applicable filters from this controller
         filters = (info[:filters] || []).select do |f|
           if f[:only]&.any?
             f[:only].map(&:to_s).include?(action_name.to_s)
@@ -184,19 +184,33 @@ module RailsAiContext
           end
         end
 
-        # Extract source code with line numbers
+        # Detect skip_before_action declarations in the child controller source
         source_path = Rails.root.join("app", "controllers", "#{controller_name.underscore}.rb")
+        skipped_filters = detect_skipped_filters(source_path, action_name)
+
+        # Include inherited filters from parent controller, excluding skipped ones
+        parent_filters = detect_parent_filters(info[:parent_class]).reject do |f|
+          skipped_filters.include?(f[:name])
+        end
+
+        # Extract source code with line numbers
         source_with_lines = extract_method_with_lines(source_path, action_name)
 
         lines = [ "# #{controller_name}##{action_name}", "" ]
         lines << "**File:** `app/controllers/#{controller_name.underscore}.rb`"
 
-        if filters.any?
+        if parent_filters.any? || filters.any? || skipped_filters.any?
           lines << "" << "## Applicable Filters"
+          parent_filters.each do |f|
+            lines << "- `#{f[:kind]}` **#{f[:name]}** _(from #{info[:parent_class]})_"
+          end
           filters.each do |f|
             line = "- `#{f[:kind]}` **#{f[:name]}**"
             line += " (only: #{f[:only].join(', ')})" if f[:only]&.any?
             lines << line
+          end
+          skipped_filters.each do |name|
+            lines << "- ~~#{name}~~ _(skipped)_"
           end
         end
 
@@ -216,6 +230,18 @@ module RailsAiContext
               lines << "### #{pm[:name]} (lines #{pm[:start_line]}-#{pm[:end_line]})"
               lines << "```ruby" << pm[:code] << "```"
             end
+          end
+
+          # Render map: redirects, renders, and side effects
+          render_map = extract_render_map(source_with_lines[:code])
+          if render_map[:redirects].any? || render_map[:renders].any?
+            lines << "" << "## Render Map"
+            render_map[:redirects].each { |r| lines << "- **Redirect:** #{r}" }
+            render_map[:renders].each { |r| lines << "- **Render:** #{r}" }
+          end
+          if render_map[:side_effects].any?
+            lines << "" << "## Side Effects"
+            render_map[:side_effects].each { |s| lines << "- #{s}" }
           end
         else
           lines << "" << "_Could not extract source code. File: #{source_path}_"
@@ -296,6 +322,89 @@ module RailsAiContext
         filters
       rescue
         []
+      end
+
+      # Detect skip_before_action declarations in a controller source file
+      private_class_method def self.detect_skipped_filters(source_path, action_name)
+        return [] unless File.exist?(source_path)
+        return [] if File.size(source_path) > RailsAiContext.configuration.max_file_size
+
+        source = File.read(source_path, encoding: "UTF-8") rescue nil
+        return [] unless source
+
+        skipped = []
+        source.each_line do |line|
+          if (m = line.match(/\A\s*skip_before_action\s+:(\w+)/))
+            # Check if the skip applies to this action
+            if line.include?("only:")
+              only_match = line.match(/only:\s*\[?\s*([^\]]+)\]?/)
+              if only_match
+                only_actions = only_match[1].scan(/:(\w+)/).flatten
+                next unless only_actions.map(&:to_s).include?(action_name.to_s)
+              end
+            end
+            skipped << m[1]
+          end
+        end
+        skipped
+      rescue
+        []
+      end
+
+      # Extract render map from action source: redirects, renders, and side effects
+      private_class_method def self.extract_render_map(code)
+        redirects = []
+        renders = []
+        side_effects = []
+
+        code.each_line do |line|
+          stripped = line.strip
+
+          # Detect redirect_to calls
+          if (m = stripped.match(/redirect_to\s+(.+)/))
+            target = m[1].sub(/\s*,\s*(status|notice|alert|flash):.*/, "")
+            desc = "redirect_to #{target.strip}"
+            flash_parts = []
+            flash_parts << "notice: #{Regexp.last_match(1)}" if stripped.match(/notice:\s*("[^"]*"|'[^']*'|[^,)]+)/)
+            flash_parts << "alert: #{Regexp.last_match(1)}" if stripped.match(/alert:\s*("[^"]*"|'[^']*'|[^,)]+)/)
+            desc += " (#{flash_parts.join(', ')})" if flash_parts.any?
+            redirects << desc
+          end
+
+          # Detect render calls
+          if (m = stripped.match(/render\s+(.+)/))
+            render_args = m[1]
+            desc = "render #{render_args.sub(/\s*\}?\s*$/, "").strip}"
+            renders << desc
+          end
+
+          # Detect side effects
+          if stripped.match?(/\.save[!]?(\s|\(|$)/)
+            obj = stripped.match(/(\S+)\.save/)&.send(:[], 1) || "object"
+            side_effects << "#{obj}.save"
+          end
+          if stripped.match?(/\.update[!]?[\s(]/)
+            obj = stripped.match(/(\S+)\.update/)&.send(:[], 1) || "object"
+            side_effects << "#{obj}.update"
+          end
+          if stripped.match?(/\.destroy[!]?(\s|\(|$)/)
+            obj = stripped.match(/(\S+)\.destroy/)&.send(:[], 1) || "object"
+            side_effects << "#{obj}.destroy"
+          end
+          if (m = stripped.match(/(\S+)\.perform_later/))
+            side_effects << "#{m[1]}.perform_later"
+          end
+          if (m = stripped.match(/(\S+)\.(increment_\w+[!]?)/))
+            side_effects << "#{m[1]}.#{m[2]}"
+          end
+          if (m = stripped.match(/(\S+)\.deliver(_later|_now)?/))
+            side_effects << "#{m[1]}.deliver#{m[2]}"
+          end
+        end
+
+        { redirects: redirects.uniq, renders: renders.uniq, side_effects: side_effects.uniq }
+      rescue
+        { redirects: [], renders: [], side_effects: [] }
       end
 
       private_class_method def self.extract_method_with_lines(file_path, method_name)
