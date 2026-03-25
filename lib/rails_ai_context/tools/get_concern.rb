@@ -386,7 +386,14 @@ module RailsAiContext
       # Extract method source from raw source string using indentation-based matching
       private_class_method def self.extract_method_source(source, method_name)
         source_lines = source.lines
-        start_idx = source_lines.index { |l| l.match?(/\A\s*def\s+#{Regexp.escape(method_name.to_s)}\b/) }
+        escaped = Regexp.escape(method_name.to_s)
+        # Don't use \b after ? or ! — they ARE word boundaries
+        pattern = if method_name.to_s.end_with?("?") || method_name.to_s.end_with?("!")
+          /\A\s*def\s+#{escaped}/
+        else
+          /\A\s*def\s+#{escaped}\b/
+        end
+        start_idx = source_lines.index { |l| l.match?(pattern) }
         return nil unless start_idx
 
         def_indent = source_lines[start_idx][/\A\s*/].length
