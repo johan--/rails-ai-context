@@ -626,14 +626,16 @@ module RailsAiContext
           model_data[:associations]&.each { |a| valid << a[:name]; valid << a[:foreign_key] if a[:foreign_key] }
           valid.merge(%w[id _destroy created_at updated_at])
 
-          # Collect JSONB/JSON column names — params matching these names are valid
-          json_column_names = Set.new
-          table_data[:columns]&.each { |c| json_column_names << c[:name] if %w[jsonb json].include?(c[:type]) }
+          # When JSONB columns exist, plain-word params may be keys inside JSONB columns.
+          # Only flag _id params (FKs must be real columns) when JSONB is present.
+          has_json_columns = table_data[:columns]&.any? { |c| %w[jsonb json].include?(c[:type]) }
 
           pc[:params].each do |param|
             next if param.end_with?("_attributes") # nested attributes
             next if valid.include?(param)
-            next if json_column_names.include?(param) # direct JSONB column reference
+            # When JSONB columns exist, only flag _id params (FKs must be real columns)
+            # Plain-word params could be keys inside JSONB columns
+            next if has_json_columns && !param.end_with?("_id")
             warnings << "permits :#{param} \u2014 not a column in #{table_name} table (check virtual attributes or add migration)"
           end
         end
