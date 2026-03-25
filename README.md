@@ -73,16 +73,19 @@ Definition + source code + every caller grouped by type + what it calls internal
 
 ---
 
-## 37% fewer tokens (measured)
+## Measured token savings
 
-```
-No rails-ai-context          45,477 tk  █████████████████████████████████████████████
-Normal Claude /init           40,700 tk  █████████████████████████████████████████     -11%
-rails-ai-context CLAUDE.md    33,106 tk  █████████████████████████████████             -27%
-rails-ai-context (full)       28,834 tk  █████████████████████████████                 -37%
-```
+Tested on a real Rails 8 app (5 models, 19 controllers, 95 routes):
 
-> Measured on a real 5-model Rails 8 app. Savings scale with app size — a 50-model app with auth + payments + mailers saves 60-80%.
+| Task | Without gem | With gem | Saved |
+|------|-------------|----------|-------|
+| Add a field to Cook (13 files) | ~16,283 tokens | ~1,860 tokens | **88%** |
+| Check schema (all tables) | ~2,573 tokens | ~908 tokens | **65%** |
+| Trace `can_cook?` across codebase | ~9,080 tokens | ~198 tokens | **98%** |
+
+"Without" = AI reads entire files. "With" = AI uses MCP tools that return only what's relevant.
+
+> Savings scale with app size. More models + more files = bigger savings.
 
 But tokens are the side effect. The real value:
 
