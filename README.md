@@ -71,14 +71,16 @@ Definition + source code + every caller grouped by type + what it calls internal
 
 ---
 
-## 88% fewer tokens
+## 37% fewer tokens (measured)
 
 ```
-Without rails-ai-context    ~11,500 tokens  ████████████████████████████████████████
-With rails-ai-context         ~1,350 tokens  █████                                    88% saved
+No rails-ai-context          45,477 tk  █████████████████████████████████████████████
+Normal Claude /init           40,700 tk  █████████████████████████████████████████     -11%
+rails-ai-context CLAUDE.md    33,106 tk  █████████████████████████████████             -27%
+rails-ai-context (full)       28,834 tk  █████████████████████████████                 -37%
 ```
 
-> Token savings scale with app size. A 50-model app with auth + payments + mailers saves even more.
+> Measured on a real 5-model Rails 8 app. Savings scale with app size — a 50-model app with auth + payments + mailers saves 60-80%.
 
 But tokens are the side effect. The real value:
 
