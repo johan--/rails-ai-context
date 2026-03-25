@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-03-25
+
+### Added
+
+- **`match_type:"trace"` in search_code** — full method picture in one call: definition + source code + all callers grouped by type (Controller/Model/View/Job/Service/Test) + internal calls. The game changer for code navigation.
+- **`match_type:"call"`** — find call sites only, excluding definitions.
+- **Smart result limiting** — <10 shows all, 10-100 shows half, >100 caps at 100. Pagination via `offset:` param.
+- **`exclude_tests:true`** — skip test/spec/features directories in search results.
+- **`group_by_file:true`** — group search results by file with match counts.
+- **Inline cross-references** — schema shows model name + association count per table, routes show controller filters inline, views use pipe-separated metadata.
+- **Test template generation** — `get_test_info(detail:"standard")` includes a copy-paste test template matching the app's patterns (Minitest/RSpec, Devise sign_in, fixtures).
+- **Interactive AI tool selection** — install generator and `rails ai:context` prompt users to select which AI tools they use (Claude, Cursor, Copilot, Windsurf, OpenCode). Selection saved to `config.ai_tools`.
+- **Brakeman in validate** — `rails_validate(level:"rails")` now runs Brakeman security checks inline alongside syntax and semantic checks.
+
+### Fixed
+
+- **Documentation audit** — fixed max_tool_response_chars reference (120K→200K), added missing search_code params to GUIDE, added config.ai_tools to config reference.
+
 ## [2.0.1] - 2026-03-25
 
 ### Fixed

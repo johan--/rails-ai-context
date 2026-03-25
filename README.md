@@ -111,7 +111,7 @@ The gem exposes **25 read-only tools** via MCP that AI clients call on-demand:
 | `rails_get_test_info` | Test framework, factory attributes/traits, fixtures, CI config, coverage |
 | `rails_get_gems` | Notable gems categorized by function with config location hints |
 | `rails_get_conventions` | Architecture patterns, frontend stack, directory structure |
-| `rails_search_code` | Ripgrep search with 2-line context default, `match_type:"definition"` for method defs only |
+| `rails_search_code` | Ripgrep search with `match_type:"trace"` (definition + callers + internal calls in one shot), `"definition"`, `"call"`, `"class"` filters, smart result limiting, pagination |
 | `rails_get_view` | View templates, partials with render locals, Stimulus references |
 | `rails_get_stimulus` | Stimulus controllers — targets, values, actions, outlets, lifecycle methods |
 | `rails_get_edit_context` | Surgical edit helper — returns code with class/method context and line numbers |
@@ -146,7 +146,7 @@ rails_get_routes(controller: "users")         # → routes for one controller
 rails_get_model_details(model: "User")        # → associations, validations, scopes
 ```
 
-A safety net (`max_tool_response_chars`, default 120K) truncates oversized responses with hints to use filters.
+A safety net (`max_tool_response_chars`, default 200K) truncates oversized responses with hints to use filters.
 
 ---
 
@@ -351,6 +351,7 @@ end
 | **Extensibility** | | |
 | `custom_tools` | `[]` | Additional MCP tool classes to register alongside built-in tools |
 | `skip_tools` | `[]` | Built-in tool names to exclude (e.g. `%w[rails_security_scan]`) |
+| `ai_tools` | `nil` (all) | AI tools to generate context for: `%i[claude cursor copilot windsurf opencode]` |
 </details>
 
 ---

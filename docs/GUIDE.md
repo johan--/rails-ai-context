@@ -561,31 +561,38 @@ Ripgrep-powered regex search across the codebase.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `pattern` | string | **Required.** Regex pattern to search for. |
+| `pattern` | string | **Required.** Regex pattern or method name to search for. |
 | `path` | string | Subdirectory to search in (e.g. `app/models`, `config`). Default: entire app. |
-| `file_type` | string | Filter by file type (e.g. `rb`, `erb`, `js`). Alphanumeric only. |
-| `match_type` | string | Filter matches: `any` (default), `definition` (only `def` lines), `class` (only `class`/`module` lines). |
+| `file_type` | string | Filter by file extension (e.g. `rb`, `erb`, `js`). Alphanumeric only. |
+| `match_type` | string | `any` (default), `definition` (def lines), `class` (class/module lines), `call` (call sites only), `trace` (**full picture** — definition + source + callers + internal calls). |
 | `exact_match` | boolean | Match whole words only (wraps pattern in `\b` boundaries). Default: false. |
-| `max_results` | integer | Max results to return. Default: 30, max: 100. |
+| `exclude_tests` | boolean | Exclude test/spec/features directories. Default: false. |
+| `group_by_file` | boolean | Group results by file with match counts. Default: false. |
+| `offset` | integer | Skip this many results for pagination. Default: 0. |
 | `context_lines` | integer | Lines of context before and after each match (like grep -C). Default: 2, max: 5. |
+
+Smart result limiting: <10 results shows all, 10-100 shows half, >100 caps at 100. Use `offset` for pagination.
 
 **Examples:**
 
 ```
-rails_search_code(pattern: "has_secure_password")
-  → All files containing has_secure_password
+rails_search_code(pattern: "can_cook?", match_type: "trace")
+  → FULL PICTURE: definition + source code + all callers grouped by type + internal calls
 
-rails_search_code(pattern: "class.*Controller", file_type: "rb")
-  → All Ruby files with controller class definitions
+rails_search_code(pattern: "create", match_type: "definition")
+  → Only `def create` / `def self.create` lines
 
-rails_search_code(pattern: "def create", file_type: "rb", max_results: 50)
-  → First 50 create methods across the codebase
+rails_search_code(pattern: "can_cook", match_type: "call")
+  → Only call sites (excludes the definition)
 
-rails_search_code(pattern: "current_user", path: "app/controllers")
-  → Search only in app/controllers/
+rails_search_code(pattern: "Controller", match_type: "class")
+  → All class/module definitions matching *Controller
 
-rails_search_code(pattern: "validates", context_lines: 3)
-  → Matches with 3 lines of context before and after (default is 2)
+rails_search_code(pattern: "has_many", group_by_file: true)
+  → Results grouped by file with match counts
+
+rails_search_code(pattern: "cook", exclude_tests: true)
+  → Skip test/spec directories
 
 rails_search_code(pattern: "activate", match_type: "definition")
   → Only `def activate` / `def self.activate` lines (skips method calls)
@@ -1175,6 +1182,7 @@ end
 | `cache_ttl` | Integer | `60` | Cache TTL in seconds for introspection results |
 | `custom_tools` | Array | `[]` | Additional MCP tool classes to register alongside built-in tools |
 | `skip_tools` | Array | `[]` | Built-in tool names to exclude (e.g. `%w[rails_security_scan]`) |
+| `ai_tools` | Array | `nil` (all) | AI tools to generate context for: `%i[claude cursor copilot windsurf opencode]`. Selected during install. |
 | `excluded_models` | Array | internal Rails models | Models to skip |
 | `excluded_paths` | Array | `node_modules tmp log vendor .git` | Paths excluded from code search |
 | `sensitive_patterns` | Array | `.env`, `.key`, `.pem`, credentials | File patterns blocked from search and read tools |
