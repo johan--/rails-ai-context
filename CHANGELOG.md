@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-03-25
+
+### Added
+
+- **Orphaned table detection** — `get_schema` standard mode flags tables with no ActiveRecord model: "⚠ Orphaned tables: content_calendars, cook_comments"
+- **Concern method source code** — `get_concern(name:"X", detail:"full")` shows method bodies inline, same pattern as callbacks tool.
+- **analyze_feature: inherited filters** — shows `authenticate_user! (from ApplicationController)` in controller section.
+- **analyze_feature: code-ready route helpers** — `cook_path(@record)`, `cooks_path` inline with routes.
+- **analyze_feature: service test gaps** — checks services for missing test files, not just models/controllers/jobs.
+- **All 6 serializers updated** — Claude, Cursor, Copilot, Windsurf, OpenCode all document trace mode, concern source, orphaned tables, inherited filters.
+
 ## [2.0.3] - 2026-03-25
 
 ### Added
