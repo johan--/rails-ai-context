@@ -338,7 +338,7 @@ module RailsAiContext
           lines << "- All interactive elements MUST have hover: and focus: states" if patterns.dig(:interactive_states, "hover") || patterns.dig(:interactive_states, "focus")
 
           if patterns.dig(:layout, :spacing_scale)&.any?
-            top = patterns[:layout][:spacing_scale].keys.first(4).join(", ")
+            top = safe_keys(patterns[:layout][:spacing_scale], 4).join(", ")
             lines << "- Use existing spacing scale: #{top}"
           end
 
@@ -361,9 +361,9 @@ module RailsAiContext
           if typo[:heading_styles]&.any?
             typo[:heading_styles].each { |tag, classes| lines << "- **#{tag}:** `#{classes}`" }
           end
-          lines << "- Sizes: #{typo[:sizes].keys.join(', ')}" if typo[:sizes]&.any?
-          lines << "- Weights: #{typo[:weights].keys.join(', ')}" if typo[:weights]&.any?
-          lines << "- Line height: #{typo[:line_height].keys.join(', ')}" if typo[:line_height]&.any?
+          lines << "- Sizes: #{safe_keys(typo[:sizes]).join(', ')}" if typo[:sizes]&.any?
+          lines << "- Weights: #{safe_keys(typo[:weights]).join(', ')}" if typo[:weights]&.any?
+          lines << "- Line height: #{safe_keys(typo[:line_height]).join(', ')}" if typo[:line_height]&.any?
           lines << ""
           lines
         end
@@ -374,10 +374,10 @@ module RailsAiContext
           return [] if layout.empty? && fl.empty?
 
           lines = [ "## Layout & Spacing", "" ]
-          lines << "- Containers: #{layout[:containers].keys.join(', ')}" if layout[:containers]&.any?
-          lines << "- Grid: #{layout[:grid].keys.join(', ')}" if layout[:grid]&.any?
-          lines << "- Flex: #{layout[:flex].keys.first(5).join(', ')}" if layout[:flex]&.any?
-          lines << "- Spacing scale: #{layout[:spacing_scale].keys.join(', ')}" if layout[:spacing_scale]&.any?
+          lines << "- Containers: #{safe_keys(layout[:containers]).join(', ')}" if layout[:containers]&.any?
+          lines << "- Grid: #{safe_keys(layout[:grid]).join(', ')}" if layout[:grid]&.any?
+          lines << "- Flex: #{safe_keys(layout[:flex], 5).join(', ')}" if layout[:flex]&.any?
+          lines << "- Spacing scale: #{safe_keys(layout[:spacing_scale]).join(', ')}" if layout[:spacing_scale]&.any?
           lines << "- Form spacing: #{fl[:spacing]}" if fl[:spacing]
           lines << "- Form grid: #{fl[:grid]}" if fl[:grid]
           lines << ""
@@ -390,7 +390,7 @@ module RailsAiContext
 
           lines = [ "## Responsive Breakpoints", "" ]
           responsive.each do |bp, classes|
-            lines << "- **#{bp}:** #{classes.keys.first(5).join(', ')}"
+            lines << "- **#{bp}:** #{safe_keys(classes, 5).join(', ')}"
           end
           lines << ""
           lines
@@ -402,7 +402,7 @@ module RailsAiContext
 
           lines = [ "## Interactive States", "" ]
           states.each do |state, classes|
-            lines << "- **#{state}:** #{classes.keys.first(4).join(', ')}"
+            lines << "- **#{state}:** #{safe_keys(classes, 4).join(', ')}"
           end
           lines << ""
           lines
@@ -414,7 +414,7 @@ module RailsAiContext
 
           lines = [ "## Dark Mode", "" ]
           lines << "Dark mode is active. Use `dark:` prefix for all color-dependent classes."
-          lines << "- Common patterns: #{dark[:patterns].keys.first(8).join(', ')}" if dark[:patterns]&.any?
+          lines << "- Common patterns: #{safe_keys(dark[:patterns], 8).join(', ')}" if dark[:patterns]&.any?
           lines << ""
           lines
         end
@@ -426,7 +426,7 @@ module RailsAiContext
           lines = [ "## Icons", "" ]
           lines << "- Library: #{icons[:library]}" if icons[:library]
           lines << "- Inline SVGs: #{icons[:inline_svg_count]}" if icons[:inline_svg_count]
-          lines << "- Sizes: #{icons[:sizes].keys.first(3).join(', ')}" if icons[:sizes]&.any?
+          lines << "- Sizes: #{safe_keys(icons[:sizes], 3).join(', ')}" if icons[:sizes]&.any?
           lines << ""
           lines
         end
@@ -436,10 +436,10 @@ module RailsAiContext
           return [] unless anims.is_a?(Hash) && anims.any?
 
           lines = [ "## Animations & Transitions", "" ]
-          lines << "- Transitions: #{anims[:transitions].keys.join(', ')}" if anims[:transitions]&.any?
-          lines << "- Durations: #{anims[:durations].keys.join(', ')}" if anims[:durations]&.any?
-          lines << "- Animations: #{anims[:animates].keys.join(', ')}" if anims[:animates]&.any?
-          lines << "- Easing: #{anims[:easing].keys.join(', ')}" if anims[:easing]&.any?
+          lines << "- Transitions: #{safe_keys(anims[:transitions]).join(', ')}" if anims[:transitions]&.any?
+          lines << "- Durations: #{safe_keys(anims[:durations]).join(', ')}" if anims[:durations]&.any?
+          lines << "- Animations: #{safe_keys(anims[:animates]).join(', ')}" if anims[:animates]&.any?
+          lines << "- Easing: #{safe_keys(anims[:easing]).join(', ')}" if anims[:easing]&.any?
           lines << ""
           lines
         end
@@ -460,6 +460,12 @@ module RailsAiContext
           end
 
           lines
+        end
+
+        # Safe key extraction — handles both Hash and Array
+        def safe_keys(value, limit = nil)
+          names = value.is_a?(Hash) ? value.keys : Array(value)
+          limit ? names.first(limit) : names
         end
       end
     end
