@@ -9,12 +9,16 @@
 
 **Works with:** Claude Code &bull; Cursor &bull; GitHub Copilot &bull; OpenCode &bull; Any terminal
 
+> Built by a Rails developer with 10+ years of production experience. AI assisted — the same way it assists me shipping features at work. I designed the architecture, made every decision, reviewed every line, and wrote 653 tests. This gem exists because I understand Rails deeply enough to know exactly what AI agents get wrong and what context they need to get it right.
+
 ```bash
 gem "rails-ai-context", group: :development
 rails generate rails_ai_context:install
 ```
 
 That's it. Your AI now has 25 tools that understand your entire Rails app — via MCP server or CLI. Zero config.
+
+> **[Full Guide →](docs/GUIDE.md)** — every command, every parameter, every configuration option.
 
 ---
 
