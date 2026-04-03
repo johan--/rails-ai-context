@@ -97,13 +97,24 @@ rescue => e
 end unless defined?(save_tool_mode_to_initializer)
 
 def ensure_mcp_json
+  require "json"
   mcp_path = Rails.root.join(".mcp.json")
-  return if File.exist?(mcp_path)
-
   server_entry = { "command" => "bundle", "args" => [ "exec", "rails", "ai:serve" ] }
-  content = JSON.pretty_generate({ mcpServers: { "rails-ai-context" => server_entry } }) + "\n"
-  File.write(mcp_path, content)
-  puts "✅ Created .mcp.json (MCP auto-discovery for Claude Code, Cursor, etc.)"
+
+  if File.exist?(mcp_path)
+    existing = JSON.parse(File.read(mcp_path)) rescue {}
+    existing["mcpServers"] ||= {}
+    if existing["mcpServers"]["rails-ai-context"] == server_entry
+      return # already up to date
+    end
+    existing["mcpServers"]["rails-ai-context"] = server_entry
+    File.write(mcp_path, JSON.pretty_generate(existing) + "\n")
+    puts "✅ Updated rails-ai-context in .mcp.json"
+  else
+    content = JSON.pretty_generate({ mcpServers: { "rails-ai-context" => server_entry } }) + "\n"
+    File.write(mcp_path, content)
+    puts "✅ Created .mcp.json (MCP auto-discovery for Claude Code, Cursor, etc.)"
+  end
 rescue => e
   puts "⚠️  Could not create .mcp.json: #{e.message}"
 end unless defined?(ensure_mcp_json)
@@ -156,6 +167,99 @@ rescue => e
   $stderr.puts "[rails-ai-context] save_yaml_config failed: #{e.message}" if ENV["DEBUG"]
   nil
 end unless defined?(save_yaml_config)
+
+FORMAT_PATHS = {
+  claude:   %w[CLAUDE.md .claude/rules],
+  cursor:   %w[.cursor/rules],
+  copilot:  %w[.github/copilot-instructions.md .github/instructions],
+  opencode: %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md]
+}.freeze unless defined?(FORMAT_PATHS)
+
+def read_previous_ai_tools_from_config
+  # Try initializer first
+  init_path = Rails.root.join("config/initializers/rails_ai_context.rb")
+  if File.exist?(init_path)
+    content = File.read(init_path)
+    match = content.match(/^\s*config\.ai_tools\s*=\s*%i\[([^\]]*)\]/)
+    return match[1].split.map(&:to_sym) if match
+  end
+
+  # Fall back to YAML
+  yaml_path = Rails.root.join(".rails-ai-context.yml")
+  if File.exist?(yaml_path)
+    require "yaml"
+    data = YAML.safe_load_file(yaml_path, permitted_classes: [ Symbol ]) || {}
+    tools = data["ai_tools"]
+    return tools.map(&:to_sym) if tools.is_a?(Array) && tools.any?
+  end
+
+  nil
+rescue => e
+  $stderr.puts "[rails-ai-context] read_previous_ai_tools_from_config failed: #{e.message}" if ENV["DEBUG"]
+  nil
+end unless defined?(read_previous_ai_tools_from_config)
+
+def cleanup_removed_ai_tools(previous, current)
+  removed = previous.map(&:to_sym) - current.map(&:to_sym)
+  return if removed.empty?
+
+  puts ""
+  puts "These AI tools were removed from your selection:"
+  removed.each_with_index do |fmt, idx|
+    tool = AI_TOOL_OPTIONS.values.find { |t| t[:key] == fmt }
+    puts "  #{idx + 1}. #{tool[:name]}" if tool
+  end
+  puts ""
+  puts "Remove their generated files?"
+  puts "  y — remove all listed above"
+  puts "  n — keep all (default)"
+  puts "  1,2 — remove only specific ones by number"
+  puts ""
+  print "Enter choice: "
+  input = $stdin.gets&.strip&.downcase || "n"
+  return if input.empty? || input == "n" || input == "no"
+
+  to_remove = if input == "y" || input == "yes" || input == "a"
+    removed
+  else
+    nums = input.split(/[\s,]+/).filter_map { |n| n.to_i - 1 }
+    nums.filter_map { |i| removed[i] if i >= 0 && i < removed.size }
+  end
+
+  return if to_remove.empty?
+
+  require "fileutils"
+  to_remove.each do |fmt|
+    tool = AI_TOOL_OPTIONS.values.find { |t| t[:key] == fmt }
+    paths = FORMAT_PATHS[fmt] || []
+    paths.each do |rel_path|
+      full = Rails.root.join(rel_path)
+      if File.directory?(full)
+        FileUtils.rm_rf(full)
+        puts "  Removed #{rel_path}/"
+      elsif File.exist?(full)
+        FileUtils.rm_f(full)
+        puts "  Removed #{rel_path}"
+      end
+    end
+    puts "  ✅ #{tool[:name]} files removed" if tool
+  end
+end unless defined?(cleanup_removed_ai_tools)
+
+def add_ai_context_to_gitignore
+  gitignore = Rails.root.join(".gitignore")
+  return unless File.exist?(gitignore)
+
+  content = File.read(gitignore)
+  return if content.include?(".ai-context.json")
+
+  File.open(gitignore, "a") do |f|
+    f.puts ""
+    f.puts "# rails-ai-context (JSON cache — markdown files should be committed)"
+    f.puts ".ai-context.json"
+  end
+  puts "✅ Updated .gitignore"
+end unless defined?(add_ai_context_to_gitignore)
 
 def add_ai_tool_to_initializer(format)
   init_path = Rails.root.join("config/initializers/rails_ai_context.rb")
@@ -237,6 +341,7 @@ namespace :ai do
     apply_context_mode_override
 
     ai_tools = RailsAiContext.configuration.ai_tools
+    previous_tools = read_previous_ai_tools_from_config
 
     # First time — no tools configured, ask the user
     if ai_tools.nil?
@@ -251,12 +356,18 @@ namespace :ai do
       save_tool_mode_to_initializer(tool_mode)
     end
 
+    # Cleanup removed tools (only when re-running with different selections)
+    cleanup_removed_ai_tools(previous_tools, ai_tools) if previous_tools&.any? && ai_tools
+
     # Write .rails-ai-context.yml alongside initializer (enables standalone mode)
     save_yaml_config(ai_tools || RailsAiContext.configuration.ai_tools,
                      RailsAiContext.configuration.tool_mode)
 
-    # Auto-create .mcp.json when tool_mode is :mcp and it doesn't exist
+    # Auto-create/update .mcp.json when tool_mode is :mcp
     ensure_mcp_json if RailsAiContext.configuration.tool_mode == :mcp
+
+    # Add .ai-context.json to .gitignore
+    add_ai_context_to_gitignore
 
     puts "🔍 Introspecting #{Rails.application.class.module_parent_name}..."
 
@@ -275,6 +386,11 @@ namespace :ai do
     puts ""
     puts "Done! Commit these files so your team benefits."
     puts "Change AI tools: config/initializers/rails_ai_context.rb (config.ai_tools)"
+    puts ""
+    puts "Standalone (no Gemfile needed):"
+    puts "  gem install rails-ai-context"
+    puts "  rails-ai-context init          # interactive setup"
+    puts "  rails-ai-context serve         # start MCP server"
   end
 
   desc "Generate AI context in a specific format (claude, cursor, copilot, json)"
