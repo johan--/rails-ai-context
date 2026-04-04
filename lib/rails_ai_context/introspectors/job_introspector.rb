@@ -54,7 +54,7 @@ module RailsAiContext
         return [] unless Dir.exist?(jobs_dir)
 
         Dir.glob(File.join(jobs_dir, "**/*.rb")).filter_map do |path|
-          source = File.read(path) rescue next
+          source = RailsAiContext::SafeFile.read(path) or next
 
           # Extract class name
           class_match = source.match(/class\s+(\S+)\s*</)
@@ -99,7 +99,8 @@ module RailsAiContext
         path = paths.find { |p| File.exist?(p) }
         return [] unless path
 
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return [] unless content
         jobs = []
         content.scan(/(\w+):\s*\n\s+class:\s*(\w+).*?(?:schedule:\s*["']?([^"'\n]+))?/m) do |name, klass, schedule|
           jobs << { name: name, class: klass, schedule: schedule&.strip }.compact
@@ -114,7 +115,8 @@ module RailsAiContext
         path = File.join(app.root, "config", "sidekiq.yml")
         return nil unless File.exist?(path)
 
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return nil unless content
         config = {}
         config[:concurrency] = $1.to_i if content.match(/concurrency:\s*(\d+)/)
         queues = content.scan(/-\s*(?:\[?\s*)?(\w+)/).flatten.uniq

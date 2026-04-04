@@ -201,7 +201,7 @@ module RailsAiContext
             # Parse migration for table/column info
             full_path = File.join(root, file)
             if File.exist?(full_path)
-              source = File.read(full_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue nil
+              source = RailsAiContext::SafeFile.read(full_path)
               if source
                 tables = source.scan(/(?:create_table|add_column|remove_column|rename_column|add_index|add_reference)\s+:(\w+)/).flatten.uniq
                 if tables.any?
@@ -252,7 +252,7 @@ module RailsAiContext
           migration_files.each do |entry|
             full_path = File.join(root, entry[:file])
             next unless File.exist?(full_path)
-            source = File.read(full_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            source = RailsAiContext::SafeFile.read(full_path) or next
 
             # New columns ending in _id without add_index
             source.scan(/add_column\s+:\w+,\s+:(\w+_id)/).flatten.each do |col|

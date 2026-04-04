@@ -33,7 +33,7 @@ module RailsAiContext
           relative = path.sub("#{dir}/", "")
           next if relative == "application_mailbox.rb"
 
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           name = File.basename(path, ".rb").camelize
 
           routing = content.scan(/routing\s+(.+?)\s+=>\s+:(\w+)/).map do |match|

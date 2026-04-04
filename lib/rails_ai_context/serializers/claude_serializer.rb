@@ -36,6 +36,7 @@ module RailsAiContext
         lines.concat(render_architecture)
         lines.concat(render_ui_patterns)
         lines.concat(render_commands)
+        lines.concat(render_warnings)
         lines.concat(render_footer)
         lines.concat(render_mcp_guide_compact)
 
@@ -227,6 +228,17 @@ module RailsAiContext
           "- `rails db:migrate` — run pending migrations",
           ""
         ]
+      end
+
+      def render_warnings
+        warnings = context[:_warnings]
+        return [] if warnings.nil? || warnings.empty?
+
+        lines = [ "", "## Warnings", "" ]
+        warnings.each do |w|
+          lines << "- **#{w[:introspector]}** skipped: #{w[:error]}"
+        end
+        lines
       end
 
       def render_footer

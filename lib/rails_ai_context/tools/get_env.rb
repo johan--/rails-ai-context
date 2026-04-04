@@ -641,10 +641,7 @@ module RailsAiContext
       end
 
       private_class_method def self.safe_read(path)
-        File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-      rescue => e
-        $stderr.puts "[rails-ai-context] safe_read failed: #{e.message}" if ENV["DEBUG"]
-        nil
+        RailsAiContext::SafeFile.read(path)
       end
 
       private_class_method def self.max_file_size

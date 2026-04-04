@@ -112,7 +112,8 @@ module RailsAiContext
               return { error: "Documentation index not found at #{INDEX_PATH}. The gem installation may be incomplete — reinstall rails-ai-context." }
             end
 
-            raw = File.read(INDEX_PATH, encoding: "bom|utf-8")
+            raw = RailsAiContext::SafeFile.read(INDEX_PATH)
+            return { error: "Failed to read documentation index at #{INDEX_PATH}." } unless raw
             data = JSON.parse(raw)
             topics = data.is_a?(Array) ? data : (data["topics"] || [])
             { topics: topics }
@@ -129,8 +130,8 @@ module RailsAiContext
           lock_path = Rails.root.join("Gemfile.lock").to_s
           return "main" unless File.exist?(lock_path)
 
-          content = File.read(lock_path, encoding: "bom|utf-8")
-          if (match = content.match(/railties\s+\((\d+\.\d+)/))
+          content = RailsAiContext::SafeFile.read(lock_path)
+          if content && (match = content.match(/railties\s+\((\d+\.\d+)/))
             "#{match[1].tr('.', '-')}-stable"
           else
             "main"
@@ -216,7 +217,7 @@ module RailsAiContext
 
           # Use cached file if < 24 hours old
           if File.exist?(cache_file) && (Time.now - File.mtime(cache_file)) < 86_400
-            return File.read(cache_file, encoding: "bom|utf-8")
+            return RailsAiContext::SafeFile.read(cache_file)
           end
 
           # Fetch from GitHub

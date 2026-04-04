@@ -70,13 +70,16 @@ RSpec.describe RailsAiContext::Tools::SearchDocs do
   before do
     allow(File).to receive(:exist?).and_call_original
     allow(File).to receive(:exist?).with(described_class::INDEX_PATH).and_return(true)
-    allow(File).to receive(:read).and_call_original
-    allow(File).to receive(:read).with(described_class::INDEX_PATH, encoding: "bom|utf-8").and_return(mock_index_json)
+    allow(File).to receive(:file?).and_call_original
+    allow(File).to receive(:file?).with(described_class::INDEX_PATH).and_return(true)
+    allow(RailsAiContext::SafeFile).to receive(:read).and_call_original
+    allow(RailsAiContext::SafeFile).to receive(:read).with(described_class::INDEX_PATH).and_return(mock_index_json)
 
     # Mock Gemfile.lock for Rails version detection
     gemfile_lock_path = Rails.root.join("Gemfile.lock").to_s
     allow(File).to receive(:exist?).with(gemfile_lock_path).and_return(true)
-    allow(File).to receive(:read).with(gemfile_lock_path, encoding: "bom|utf-8").and_return("    railties (8.0.1)\n")
+    allow(File).to receive(:file?).with(gemfile_lock_path).and_return(true)
+    allow(RailsAiContext::SafeFile).to receive(:read).with(gemfile_lock_path).and_return("    railties (8.0.1)\n")
   end
 
   describe ".call" do
@@ -163,7 +166,7 @@ RSpec.describe RailsAiContext::Tools::SearchDocs do
 
     it "handles malformed JSON index gracefully" do
       described_class.instance_variable_set(:@docs_index, nil)
-      allow(File).to receive(:read).with(described_class::INDEX_PATH, encoding: "bom|utf-8").and_return("not valid json{{{")
+      allow(RailsAiContext::SafeFile).to receive(:read).with(described_class::INDEX_PATH).and_return("not valid json{{{")
 
       result = described_class.call(query: "active record")
       text = result.content.first[:text]
@@ -257,13 +260,13 @@ RSpec.describe RailsAiContext::Tools::SearchDocs do
     it "retries after transient index load failure" do
       # First call: simulate a parse error
       described_class.instance_variable_set(:@docs_index, nil)
-      allow(File).to receive(:read).with(described_class::INDEX_PATH, encoding: "bom|utf-8").and_return("invalid json{{{")
+      allow(RailsAiContext::SafeFile).to receive(:read).with(described_class::INDEX_PATH).and_return("invalid json{{{")
 
       result1 = described_class.call(query: "active record")
       expect(result1.content.first[:text]).to include("Failed to parse")
 
       # Second call: fix the index — should retry since error wasn't memoized
-      allow(File).to receive(:read).with(described_class::INDEX_PATH, encoding: "bom|utf-8").and_return(mock_index_json)
+      allow(RailsAiContext::SafeFile).to receive(:read).with(described_class::INDEX_PATH).and_return(mock_index_json)
 
       result2 = described_class.call(query: "active record")
       expect(result2.content.first[:text]).to include("Active Record Basics")

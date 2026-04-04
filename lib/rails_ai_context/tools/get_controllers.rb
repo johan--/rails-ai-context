@@ -283,7 +283,7 @@ module RailsAiContext
         candidates = action_code.scan(/\b([a-z_]\w*[!?]?)(?:\s*[\(,]|\s*$)/).flatten.uniq
 
         # Read the full file to find private methods
-        full_source = File.readlines(source_path)
+        full_source = (RailsAiContext::SafeFile.read(source_path) || "").lines
         in_private = false
         private_methods = Set.new
 
@@ -322,7 +322,7 @@ module RailsAiContext
         return [] unless File.exist?(path)
         return [] if File.size(path) > RailsAiContext.configuration.max_file_size
 
-        source = File.read(path, encoding: "UTF-8") rescue nil
+        source = RailsAiContext::SafeFile.read(path)
         return [] unless source
 
         filters = []
@@ -343,7 +343,7 @@ module RailsAiContext
         return [] unless File.exist?(source_path)
         return [] if File.size(source_path) > RailsAiContext.configuration.max_file_size
 
-        source = File.read(source_path, encoding: "UTF-8") rescue nil
+        source = RailsAiContext::SafeFile.read(source_path)
         return [] unless source
 
         skipped = []
@@ -426,7 +426,7 @@ module RailsAiContext
       private_class_method def self.extract_method_with_lines(file_path, method_name)
         return nil unless File.exist?(file_path)
         return nil if File.size(file_path) > RailsAiContext.configuration.max_file_size
-        source_lines = File.readlines(file_path)
+        source_lines = (RailsAiContext::SafeFile.read(file_path) || "").lines
         start_idx = source_lines.index { |l| l.match?(/^\s*def\s+#{Regexp.escape(method_name.to_s)}\b/) }
         return nil unless start_idx
 

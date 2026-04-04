@@ -137,7 +137,7 @@ module RailsAiContext
         pkg_path = Rails.root.join("package.json")
         return [] unless File.exist?(pkg_path)
 
-        content = File.read(pkg_path) rescue ""
+        content = RailsAiContext::SafeFile.read(pkg_path) || ""
         stack = []
 
         # CSS frameworks
@@ -190,7 +190,7 @@ module RailsAiContext
         has_services = Dir.exist?(Rails.root.join("app", "services"))
 
         Dir.glob(File.join(controllers_dir, "**", "*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           controller_name = File.basename(path, ".rb")
 
           # Authorization: can_*? method calls with redirect + alert
@@ -341,7 +341,7 @@ module RailsAiContext
         # Detect default locale from config
         app_config = Rails.root.join("config", "application.rb")
         if File.exist?(app_config)
-          content = File.read(app_config, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue ""
+          content = RailsAiContext::SafeFile.read(app_config) || ""
           if (match = content.match(/config\.i18n\.default_locale\s*=\s*[:"'](\w+)/))
             info << "**Default locale:** #{match[1]}"
           end
@@ -352,7 +352,7 @@ module RailsAiContext
         if Dir.exist?(controllers_dir)
           samples = []
           Dir.glob(File.join(controllers_dir, "**", "*.rb")).first(10).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/(?:notice|alert|flash\[:\w+\]):\s*"([^"]+)"/).each { |m| samples << m[0] }
           end
           if samples.any?
@@ -395,7 +395,7 @@ module RailsAiContext
         detected_in = []
 
         test_files.first(5).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           has_devise = true if content.include?("Devise::Test::IntegrationHelpers")
           has_sign_in = true if content.include?("sign_in")
           has_assert_select = true if content.include?("assert_select")

@@ -80,7 +80,7 @@ module RailsAiContext
 
           files.each do |f|
             next if File.size(f) > config.max_test_file_size
-            source = File.read(f, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            source = RailsAiContext::SafeFile.read(f) or next
             expect_count += source.scan(/expect\(/).size
             should_count += source.scan(/\.should\b/).size
             create_count += source.scan(/create\(:/).size
@@ -306,7 +306,7 @@ module RailsAiContext
                 when "length"
                   max = v.dig(:options, :maximum)
                   if max
-                    lines << "    @#{setup_var}.#{attr} = \"a\" * #{max + 1}"
+                    lines << "    @#{setup_var}.#{attr} = \"a\" * #{max.to_i + 1}"
                   else
                     lines << "    @#{setup_var}.#{attr} = \"\""
                   end
@@ -572,7 +572,7 @@ module RailsAiContext
             # Try reading the fixture file directly
             fixture_file = File.join(Rails.root, "test", "fixtures", "#{plural}.yml")
             if File.exist?(fixture_file)
-              content = File.read(fixture_file, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue nil
+              content = RailsAiContext::SafeFile.read(fixture_file)
               if content
                 # YAML fixture files have top-level keys as fixture names
                 first_key = content.scan(/^([a-z_]\w*):/i).first&.first

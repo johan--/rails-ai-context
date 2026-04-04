@@ -81,7 +81,8 @@ module RailsAiContext
           return text_response("Helper file too large: #{file_path} (#{File.size(file_path)} bytes, max: #{max_size})")
         end
 
-        source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(file_path)
+        return text_response("Could not read helper file: #{file_path}") unless source
         relative_path = file_path.sub("#{root}/", "")
         module_name = File.basename(file_path, ".rb").camelize
 
@@ -139,7 +140,7 @@ module RailsAiContext
           module_name = File.basename(file_path, ".rb").camelize
 
           if File.size(file_path) <= max_size
-            source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue nil
+            source = RailsAiContext::SafeFile.read(file_path)
             methods = source ? parse_helper_methods(source) : []
           else
             methods = []
@@ -239,7 +240,7 @@ module RailsAiContext
 
           view_files.each do |view_path|
             next if File.size(view_path) > max_size
-            content = File.read(view_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(view_path) or next
 
             if content.include?(method_name)
               relative = view_path.sub("#{root}/app/views/", "")
@@ -263,7 +264,7 @@ module RailsAiContext
         gemfile_path = File.join(root, "Gemfile")
         return detected unless File.exist?(gemfile_path)
 
-        gemfile = File.read(gemfile_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue ""
+        gemfile = RailsAiContext::SafeFile.read(gemfile_path) || ""
 
         # Collect all view file content for scanning
         views_dir = File.join(root, "app", "views")
@@ -275,7 +276,7 @@ module RailsAiContext
           extensions = dir == views_dir ? "*.{erb,haml,slim}" : "*.rb"
           Dir.glob(File.join(dir, "**", extensions)).each do |path|
             next if File.size(path) > max_size
-            scan_content += (File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue "")
+            scan_content += (RailsAiContext::SafeFile.read(path) || "")
           end
         end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "mcp"
+require "json"
 
 module RailsAiContext
   # Rack middleware that intercepts requests at the configured HTTP path
@@ -23,6 +24,9 @@ module RailsAiContext
       else
         @app.call(env)
       end
+    rescue => e
+      Rails.logger.error "[rails-ai-context] MCP request failed: #{e.class}: #{e.message}"
+      json_rpc_error_response(e)
     end
 
     private
@@ -34,6 +38,19 @@ module RailsAiContext
           MCP::Server::Transports::StreamableHTTPTransport.new(server)
         end
       end
+    end
+
+    def json_rpc_error_response(error)
+      body = {
+        jsonrpc: "2.0",
+        error: {
+          code: -32603,
+          message: "Internal error: #{error.message}"
+        },
+        id: nil
+      }.to_json
+
+      [ 500, { "Content-Type" => "application/json" }, [ body ] ]
     end
   end
 end

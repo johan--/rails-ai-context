@@ -16,7 +16,7 @@ module RailsAiContext
         return static_schema_parse unless active_record_connected?
         return static_schema_parse if table_names.empty?
 
-        schema_content = File.exist?(schema_file_path) ? File.read(schema_file_path) : ""
+        schema_content = File.exist?(schema_file_path) ? (RailsAiContext::SafeFile.read(schema_file_path, max_size: RailsAiContext.configuration.max_schema_file_size) || "") : ""
 
         {
           adapter: adapter_name,
@@ -119,7 +119,8 @@ module RailsAiContext
       def parse_schema_defaults_for_table(table)
         return {} unless File.exist?(schema_file_path)
 
-        @schema_rb_content ||= File.read(schema_file_path)
+        @schema_rb_content ||= RailsAiContext::SafeFile.read(schema_file_path, max_size: RailsAiContext.configuration.max_schema_file_size)
+        return {} unless @schema_rb_content
         defaults = {}
         in_table = false
 
@@ -146,7 +147,8 @@ module RailsAiContext
 
       def current_schema_version
         if File.exist?(schema_file_path)
-          content = File.read(schema_file_path)
+          content = RailsAiContext::SafeFile.read(schema_file_path, max_size: RailsAiContext.configuration.max_schema_file_size)
+          return nil unless content
           match = content.match(/version:\s*([\d_]+)/)
           match ? match[1].delete("_") : nil
         end
@@ -190,8 +192,8 @@ module RailsAiContext
       end
 
       def parse_schema_rb(path)
-        return { error: "schema.rb too large (#{File.size(path)} bytes)" } if File.size(path) > max_schema_file_size
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path, max_size: RailsAiContext.configuration.max_schema_file_size)
+        return { error: "schema.rb too large (#{File.size(path)} bytes)" } unless content
         tables = {}
         current_table = nil
 
@@ -266,8 +268,8 @@ module RailsAiContext
       end
 
       def parse_structure_sql(path) # rubocop:disable Metrics/MethodLength
-        return { error: "structure.sql too large (#{File.size(path)} bytes)" } if File.size(path) > max_schema_file_size
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path, max_size: RailsAiContext.configuration.max_schema_file_size)
+        return { error: "structure.sql too large (#{File.size(path)} bytes)" } unless content
         tables = {}
 
         # Match CREATE TABLE blocks
@@ -410,10 +412,8 @@ module RailsAiContext
         migration_files = Dir.glob(File.join(migrations_dir, "*.rb")).sort
 
         migration_files.each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path, max_size: RailsAiContext.configuration.max_schema_file_size) or next
           replay_migration(content, tables)
-        rescue => e
-          next # Skip unparseable migrations
         end
 
         # Remove internal Rails tables

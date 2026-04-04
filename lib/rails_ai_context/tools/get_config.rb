@@ -111,7 +111,7 @@ module RailsAiContext
 
         pkg = Rails.root.join("package.json")
         if File.exist?(pkg)
-          content = File.read(pkg) rescue ""
+          content = RailsAiContext::SafeFile.read(pkg) || ""
           parts << "Tailwind" if content.include?("tailwindcss")
           parts << "Bootstrap" if content.include?("bootstrap")
           parts << "esbuild" if content.include?("esbuild")
@@ -132,7 +132,7 @@ module RailsAiContext
         cable_config = Rails.root.join("config/cable.yml")
         return nil unless File.exist?(cable_config)
 
-        content = File.read(cable_config) rescue nil
+        content = RailsAiContext::SafeFile.read(cable_config)
         return nil unless content
 
         adapter = content.match(/adapter:\s*(\w+)/)&.captures&.first

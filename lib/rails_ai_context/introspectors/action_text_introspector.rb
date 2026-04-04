@@ -32,7 +32,7 @@ module RailsAiContext
         js_dirs.each do |dir|
           next unless Dir.exist?(dir)
           Dir.glob(File.join(dir, "**", "*.{js,ts}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+            content = RailsAiContext::SafeFile.read(path) or next
             customs << "custom_toolbar" if content.match?(/Trix\.config\.toolbar/)
             customs << "custom_attachment" if content.match?(/trix-attachment|Trix\.Attachment/)
             customs << "custom_editor" if content.match?(/trix-initialize|trix-change/)
@@ -50,7 +50,7 @@ module RailsAiContext
 
         fields = []
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           model_name = File.basename(path, ".rb").camelize
 
           content.scan(/has_rich_text\s+:(\w+)/).each do |match|

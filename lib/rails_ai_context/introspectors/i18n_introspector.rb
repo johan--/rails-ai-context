@@ -95,7 +95,9 @@ module RailsAiContext
       def count_keys_for_locale(locale)
         path = Dir.glob(File.join(app.root, "config", "locales", "#{locale}.yml")).first
         return 0 unless path && File.exist?(path)
-        data = YAML.safe_load(File.read(path), permitted_classes: [ Symbol ])
+        content = RailsAiContext::SafeFile.read(path)
+        return 0 unless content
+        data = YAML.safe_load(content, permitted_classes: [ Symbol ])
         count_nested_keys(data)
       rescue => e
         $stderr.puts "[rails-ai-context] count_keys_for_locale failed: #{e.message}" if ENV["DEBUG"]

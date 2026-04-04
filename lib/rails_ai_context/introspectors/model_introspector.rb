@@ -117,7 +117,7 @@ module RailsAiContext
           # Fallback: check schema.rb for type column
           schema_path = File.join(app.root.to_s, "db", "schema.rb")
           if File.exist?(schema_path)
-            schema = File.read(schema_path)
+            schema = RailsAiContext::SafeFile.read(schema_path)
             table_section = schema[/create_table\s+"#{Regexp.escape(model.table_name)}".*?end/m]
             table_section&.match?(/t\.\w+\s+"type"/)
           end
@@ -179,7 +179,9 @@ module RailsAiContext
         source_path = model_source_path(model)
         return [] unless source_path && File.exist?(source_path)
 
-        source = File.read(source_path)
+        source = RailsAiContext::SafeFile.read(source_path)
+        return [] unless source
+
         source.scan(/^\s*scope\s+:(\w+)\s*,\s*->\s*(?:\([^)]*\)\s*)?\{([^}]*)\}/m).map do |name, body|
           { name: name, body: body.strip }
         end
@@ -194,7 +196,10 @@ module RailsAiContext
         source_path = model_source_path(model)
         return [] unless source_path && File.exist?(source_path)
 
-        File.read(source_path).scan(/^\s*validate\s+:(\w+)/).flatten
+        content = RailsAiContext::SafeFile.read(source_path)
+        return [] unless content
+
+        content.scan(/^\s*validate\s+:(\w+)/).flatten
       rescue => e
         $stderr.puts "[rails-ai-context] extract_custom_validates failed: #{e.message}" if ENV["DEBUG"]
         []
@@ -216,7 +221,9 @@ module RailsAiContext
         source_path = model_source_path(model)
         return {} unless source_path && File.exist?(source_path)
 
-        source = File.read(source_path)
+        source = RailsAiContext::SafeFile.read(source_path)
+        return {} unless source
+
         options = {}
         source.each_line do |line|
           next unless line.match?(/\A\s*enum\s+/)
@@ -274,7 +281,9 @@ module RailsAiContext
         source_path = model_source_path(model)
         return {} unless source_path && File.exist?(source_path)
 
-        source = File.read(source_path)
+        source = RailsAiContext::SafeFile.read(source_path)
+        return {} unless source
+
         callbacks = {}
         source.each_line do |line|
           if (match = line.match(/\A\s*(before_validation|after_validation|before_save|after_save|before_create|after_create|before_update|after_update|before_destroy|after_destroy|after_commit|after_rollback)\s+:(\w+)/))
@@ -348,7 +357,9 @@ module RailsAiContext
         path = model_source_path(model)
         return [] unless path && File.exist?(path)
 
-        source = File.read(path)
+        source = RailsAiContext::SafeFile.read(path)
+        return [] unless source
+
         methods = []
         in_class_methods = false
         source.each_line do |line|
@@ -407,7 +418,9 @@ module RailsAiContext
         path = model_source_path(model)
         return [] unless path && File.exist?(path)
 
-        source = File.read(path)
+        source = RailsAiContext::SafeFile.read(path)
+        return [] unless source
+
         methods = []
         in_private = false
         source.each_line do |line|
@@ -449,7 +462,9 @@ module RailsAiContext
         path = model_source_path(model)
         return {} unless path && File.exist?(path)
 
-        source = File.read(path)
+        source = RailsAiContext::SafeFile.read(path)
+        return {} unless source
+
         macros = {}
 
         macros[:has_secure_password] = true if source.match?(/\bhas_secure_password\b/)
@@ -494,7 +509,9 @@ module RailsAiContext
         path = model_source_path(model)
         return {} unless path && File.exist?(path)
 
-        source = File.read(path)
+        source = RailsAiContext::SafeFile.read(path)
+        return {} unless source
+
         macros = {}
 
         # encryption_details: encrypts :field, deterministic: true, downcase: true

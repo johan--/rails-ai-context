@@ -176,6 +176,36 @@ RSpec.describe RailsAiContext::Tools::ReadLogs do
       expect(text).not_to include("abc123secret")
     end
 
+    it "redacts Stripe secret keys" do
+      File.write(File.join(log_dir, "test.log"), "I, [2026-03-29T10:00:00 #1] INFO -- : Charge failed key=sk_live_1234567890abcdefghij\n")
+      result = described_class.call
+      text = result.content.first[:text]
+      expect(text).to include("[REDACTED]")
+      expect(text).not_to include("sk_live_1234567890abcdefghij")
+    end
+
+    it "redacts Slack tokens" do
+      File.write(File.join(log_dir, "test.log"), "I, [2026-03-29T10:00:00 #1] INFO -- : slack_token=xoxb-1234567890-abcdefghij\n")
+      result = described_class.call
+      text = result.content.first[:text]
+      expect(text).to include("[REDACTED]")
+      expect(text).not_to include("xoxb-1234567890-abcdefghij")
+    end
+
+    it "redacts GitHub personal access tokens" do
+      File.write(File.join(log_dir, "test.log"), "I, [2026-03-29T10:00:00 #1] INFO -- : token=ghp_1234567890abcdefghijklmnopqrstuvwxyz\n")
+      result = described_class.call
+      text = result.content.first[:text]
+      expect(text).not_to include("ghp_1234567890abcdefghijklmnopqrstuvwxyz")
+    end
+
+    it "redacts SendGrid API keys" do
+      File.write(File.join(log_dir, "test.log"), "I, [2026-03-29T10:00:00 #1] INFO -- : key=SG.abcdefghijklmnopqrstuv.wxyz1234567890abcdef\n")
+      result = described_class.call
+      text = result.content.first[:text]
+      expect(text).not_to include("SG.abcdefghijklmnopqrstuv.wxyz1234567890abcdef")
+    end
+
     it "sanitizes null bytes in file parameter" do
       result = described_class.call(file: "test\0.secret")
       text = result.content.first[:text]

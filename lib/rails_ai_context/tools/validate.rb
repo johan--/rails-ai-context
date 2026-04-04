@@ -246,7 +246,8 @@ module RailsAiContext
 
       private_class_method def self.validate_javascript_fallback(full_path)
         return [ false, "file too large for basic validation", [] ] if File.size(full_path) > RailsAiContext.configuration.max_file_size
-        content = File.read(full_path)
+        content = RailsAiContext::SafeFile.read(full_path)
+        return [ false, "could not read file", [] ] unless content
         stack = []
         openers = { "{" => "}", "[" => "]", "(" => ")" }
         closers = { "}" => "{", "]" => "[", ")" => "(" }
@@ -404,7 +405,7 @@ module RailsAiContext
         context = begin; cached_context; rescue; return warnings; end
         return warnings unless context
 
-        content = File.read(full_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue nil
+        content = RailsAiContext::SafeFile.read(full_path)
         return warnings unless content
 
         # Parse with Prism AST visitor (single pass for all checks)
@@ -698,7 +699,7 @@ module RailsAiContext
         # Build set of known methods (instance + from source content)
         known = Set.new(model_data[:instance_methods] || [])
         # Also check the file source for private methods
-        source = File.read(Rails.root.join(file), encoding: "UTF-8") rescue nil
+        source = RailsAiContext::SafeFile.read(Rails.root.join(file))
         source&.scan(/\bdef\s+(\w+[?!]?)/)&.each { |m| known << m[0] }
 
         # Skip check if model has concerns (method may be in concern)
@@ -880,7 +881,7 @@ module RailsAiContext
         source_path = Rails.root.join("app", "controllers", "#{ctrl_class.underscore}.rb")
         return warnings unless File.exist?(source_path)
 
-        ctrl_source = File.read(source_path, encoding: "UTF-8") rescue nil
+        ctrl_source = RailsAiContext::SafeFile.read(source_path)
         return warnings unless ctrl_source
 
         # Detect ivars from controller — handles @a, @b = multi-assignment
@@ -923,7 +924,7 @@ module RailsAiContext
 
         subscriptions = Set.new
         Dir.glob(File.join(views_dir, "**", "*.{erb,html.erb}")).each do |path|
-          view_content = File.read(path) rescue next
+          view_content = RailsAiContext::SafeFile.read(path) or next
           view_content.scan(/turbo_stream_from\s+["']([^"']+)["']/).each do |match|
             subscriptions << match[0]
           end

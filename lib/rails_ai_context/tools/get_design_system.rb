@@ -327,7 +327,7 @@ module RailsAiContext
           has_section_header = false
 
           Dir.glob(File.join(views_dir, "**", "*.html.erb")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             has_stat_card = true if content.match?(/text-3xl\s+font-bold.*text-gray-900/) && content.match?(/text-sm\s+text-gray-500/)
             has_progress_bar = true if content.match?(/bg-gray-\d+\s+rounded-full\s+h-\d/) && content.match?(/bg-orange-\d+\s+h-\d+\s+rounded-full/)
             has_section_header = true if content.match?(/flex.*justify-between.*items-center/) && content.match?(/text-lg\s+font-semibold/)

@@ -195,19 +195,14 @@ module RailsAiContext
 
           found = Dir.glob(File.join(dir, "**", "*.rb")).select do |path|
             File.basename(path, ".rb").include?(pattern) ||
-              (File.size(path) < 50_000 && File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace).downcase.include?(pattern))
+              (File.size(path) < 50_000 && (RailsAiContext::SafeFile.read(path) || "").downcase.include?(pattern))
           end
           return if found.empty?
 
           lines << "## Services (#{found.size})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
-            source = begin
-              File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-            rescue => e
-              $stderr.puts "[rails-ai-context] discover_services failed: #{e.message}" if ENV["DEBUG"]
-              next
-            end
+            source = RailsAiContext::SafeFile.read(path) or next
             line_count = source.lines.size
             methods = source.scan(/\A\s*def (?:self\.)?(\w+)/m).flatten.reject { |m| m == "initialize" }
             lines << "- `#{relative}` (#{line_count} lines)"
@@ -232,12 +227,7 @@ module RailsAiContext
           lines << "## Jobs (#{found.size})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
-            source = begin
-              File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-            rescue => e
-              $stderr.puts "[rails-ai-context] discover_jobs failed: #{e.message}" if ENV["DEBUG"]
-              next
-            end
+            source = RailsAiContext::SafeFile.read(path) or next
             queue = source.match(/queue_as\s+[:'"](\w+)/)&.captures&.first || "default"
             retries = source.match(/retry_on.*attempts:\s*(\d+)/)&.captures&.first
             lines << "- `#{relative}` (queue: #{queue}#{retries ? ", retries: #{retries}" : ""})"
@@ -261,12 +251,7 @@ module RailsAiContext
           lines << "## Views (#{found.size})"
           found.each do |path|
             relative = path.sub("#{views_dir}/", "")
-            source = begin
-              File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-            rescue => e
-              $stderr.puts "[rails-ai-context] discover_views failed: #{e.message}" if ENV["DEBUG"]
-              next
-            end
+            source = RailsAiContext::SafeFile.read(path) or next
             line_count = source.lines.size
             partials = source.scan(/render\s+(?:partial:\s*)?["']([^"']+)["']/).flatten
             stimulus = source.scan(/data-controller=["']([^"']+)["']/).flat_map { |m| m.first.split }
@@ -333,12 +318,7 @@ module RailsAiContext
           lines << "## Tests (#{found.size})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
-            source = begin
-              File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-            rescue => e
-              $stderr.puts "[rails-ai-context] discover_tests failed: #{e.message}" if ENV["DEBUG"]
-              next
-            end
+            source = RailsAiContext::SafeFile.read(path) or next
             test_count = source.scan(/\b(?:it|test|should)\b/).size
             lines << "- `#{relative}` (#{test_count} tests)"
           end
@@ -417,12 +397,7 @@ module RailsAiContext
           # Fallback: read source file
           path = Rails.root.join("app", "controllers", "#{parent_class.underscore}.rb")
           return [] unless File.exist?(path)
-          source = begin
-            File.read(path, encoding: "UTF-8")
-          rescue => e
-            $stderr.puts "[rails-ai-context] detect_parent_filters_for_analyze failed: #{e.message}" if ENV["DEBUG"]
-            nil
-          end
+          source = RailsAiContext::SafeFile.read(path)
           return [] unless source
 
           source.each_line.filter_map do |line|
@@ -529,12 +504,7 @@ module RailsAiContext
           lines << "## Mailers (#{found.size})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
-            source = begin
-              File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-            rescue => e
-              $stderr.puts "[rails-ai-context] discover_mailers failed: #{e.message}" if ENV["DEBUG"]
-              next
-            end
+            source = RailsAiContext::SafeFile.read(path) or next
             methods = source.scan(/\A\s*def (\w+)/m).flatten.reject { |m| m == "initialize" }
             lines << "- `#{relative}` — #{methods.join(', ')}" if methods.any?
           end
@@ -597,12 +567,7 @@ module RailsAiContext
           dirs.each do |dir|
             Dir.glob(File.join(dir, "**", "*.rb")).each do |path|
               next unless File.basename(path, ".rb").include?(pattern) || path.downcase.include?(pattern)
-              source = begin
-                File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-              rescue => e
-                $stderr.puts "[rails-ai-context] discover_env_dependencies failed: #{e.message}" if ENV["DEBUG"]
-                next
-              end
+              source = RailsAiContext::SafeFile.read(path) or next
               source.scan(/ENV\[["']([^"']+)["']\]|ENV\.fetch\(["']([^"']+)["']\)/).each do |m|
                 env_vars << (m[0] || m[1])
               end

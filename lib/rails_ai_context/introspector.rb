@@ -32,6 +32,17 @@ module RailsAiContext
         Rails.logger.warn "[rails-ai-context] #{name} introspection failed: #{e.message}"
       end
 
+      # Collect warnings for introspectors that failed, so serializers can
+      # render them and AI clients know which sections are missing.
+      warnings = []
+      config.introspectors.each do |name|
+        data = context[name]
+        if data.is_a?(Hash) && data[:error]
+          warnings << { introspector: name.to_s, error: data[:error] }
+        end
+      end
+      context[:_warnings] = warnings if warnings.any?
+
       context
     end
 

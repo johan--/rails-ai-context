@@ -113,11 +113,9 @@ module RailsAiContext
           names = {}
           Dir.glob(File.join(dir, "**/*.rb")).each do |path|
             file = path.sub("#{root}/", "")
-            factories = File.read(path).scan(/factory\s+:(\w+)/).flatten
+            content = RailsAiContext::SafeFile.read(path) or next
+            factories = content.scan(/factory\s+:(\w+)/).flatten
             names[file] = factories if factories.any?
-          rescue => e
-            $stderr.puts "[rails-ai-context] detect_factory_names failed: #{e.message}" if ENV["DEBUG"]
-            next
           end
           return names if names.any?
         end
@@ -132,7 +130,7 @@ module RailsAiContext
           names = {}
           Dir.glob(File.join(dir, "**/*.yml")).each do |path|
             file = File.basename(path, ".yml")
-            content = File.read(path) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             # Top-level YAML keys are fixture names
             keys = content.scan(/^(\w+):/).flatten
             names[file] = keys if keys.any?
@@ -152,7 +150,7 @@ module RailsAiContext
         helpers.each do |rel|
           path = File.join(root, rel)
           next unless File.exist?(path)
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           content.scan(/(?:config\.)?include\s+([\w:]+)/).each { |m| setup << m[0] }
         end
         setup.uniq
@@ -200,11 +198,9 @@ module RailsAiContext
       def detect_coverage
         gemfile_lock = File.join(root, "Gemfile.lock")
         return nil unless File.exist?(gemfile_lock)
-        content = File.read(gemfile_lock)
+        content = RailsAiContext::SafeFile.read(gemfile_lock)
+        return nil unless content
         return "simplecov" if content.include?("simplecov (")
-        nil
-      rescue => e
-        $stderr.puts "[rails-ai-context] detect_coverage failed: #{e.message}" if ENV["DEBUG"]
         nil
       end
 
@@ -216,7 +212,7 @@ module RailsAiContext
           traits = {}
           Dir.glob(File.join(dir, "**/*.rb")).each do |path|
             file = File.basename(path)
-            content = File.read(path) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             found_traits = content.scan(/\btrait\s+:(\w+)/).flatten
             traits[file] = found_traits if found_traits.any?
           end
@@ -234,7 +230,7 @@ module RailsAiContext
           support_dir = File.join(root, base, "support")
           next unless Dir.exist?(support_dir)
           Dir.glob(File.join(support_dir, "**/*.rb")).each do |path|
-            content = File.read(path) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/(?:shared_examples|shared_context|shared_examples_for)\s+["']([^"']+)["']/).each do |m|
               shared << { name: m[0], file: path.sub("#{root}/", "") }
             end
@@ -249,13 +245,15 @@ module RailsAiContext
       def detect_database_cleaner
         gemfile_lock = File.join(root, "Gemfile.lock")
         return nil unless File.exist?(gemfile_lock)
-        content = File.read(gemfile_lock)
+        content = RailsAiContext::SafeFile.read(gemfile_lock)
+        return nil unless content
         if content.include?("database_cleaner")
           strategy = nil
           %w[spec/rails_helper.rb spec/spec_helper.rb test/test_helper.rb].each do |helper|
             path = File.join(root, helper)
             next unless File.exist?(path)
-            helper_content = File.read(path)
+            helper_content = RailsAiContext::SafeFile.read(path)
+            next unless helper_content
             if (match = helper_content.match(/DatabaseCleaner\.strategy\s*=\s*:(\w+)/))
               strategy = match[1]
             end

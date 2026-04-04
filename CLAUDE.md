@@ -15,6 +15,8 @@ structure to AI assistants via the Model Context Protocol (MCP).
 - `lib/rails_ai_context/resources.rb` — MCP resources (static data AI clients read directly)
 - `lib/rails_ai_context/server.rb` — MCP server configuration (stdio + HTTP transports)
 - `lib/rails_ai_context/middleware.rb` — Rack middleware for auto-mounting MCP HTTP endpoint
+- `lib/rails_ai_context/safe_file.rb` — Safe file reading with size limits and error handling
+- `lib/rails_ai_context/markdown_escape.rb` — Escapes markdown special characters in dynamic content
 - `lib/rails_ai_context/fingerprinter.rb` — SHA256 file fingerprinting for cache invalidation
 - `lib/rails_ai_context/doctor.rb` — Diagnostic checks and AI readiness scoring
 - `lib/rails_ai_context/live_reload.rb` — MCP live reload: watches files, invalidates caches, notifies AI clients
@@ -66,7 +68,7 @@ structure to AI assistants via the Model Context Protocol (MCP).
 ## Testing
 
 ```bash
-bundle exec rspec           # Run specs (1529 examples)
+bundle exec rspec           # Run specs (1582 examples)
 bundle exec rubocop         # Lint
 ```
 

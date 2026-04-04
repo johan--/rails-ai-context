@@ -57,7 +57,8 @@ module RailsAiContext
         routes_path = File.join(root, "config/routes.rb")
         return [] unless File.exist?(routes_path)
 
-        content = File.read(routes_path)
+        content = RailsAiContext::SafeFile.read(routes_path)
+        return [] unless content
         engines = []
 
         # Match: mount Sidekiq::Web => "/sidekiq"

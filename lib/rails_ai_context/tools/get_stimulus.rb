@@ -232,7 +232,7 @@ module RailsAiContext
         alt_pattern = controller_name
 
         Dir.glob(File.join(views_dir, "**", "*.{erb,html.erb}")).filter_map do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           next unless content.include?(alt_pattern)
           path.sub("#{Rails.root}/app/views/", "")
         end.first(10)
@@ -246,7 +246,7 @@ module RailsAiContext
         path = Rails.root.join("app/javascript/controllers", relative_path)
         return nil unless File.exist?(path)
 
-        content = File.read(path) rescue nil
+        content = RailsAiContext::SafeFile.read(path)
         return nil unless content
 
         methods = []

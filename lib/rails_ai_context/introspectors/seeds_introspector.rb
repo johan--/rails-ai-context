@@ -32,7 +32,8 @@ module RailsAiContext
         path = File.join(root, "db/seeds.rb")
         return nil unless File.exist?(path)
 
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return { exists: false, error: "unreadable" } unless content
         {
           exists: true,
           lines: content.lines.count,
@@ -74,15 +75,12 @@ module RailsAiContext
 
         seed_files.each do |path|
           next unless File.exist?(path)
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
 
           content.scan(/\b([A-Z][A-Za-z0-9]+(?:::[A-Z][A-Za-z0-9]+)*)\s*\.\s*(?:create|find_or_create_by|upsert|insert_all|new|first_or_create|seed)/).each do |match|
             model_name = match[0]
             models << model_name unless non_models.include?(model_name)
           end
-        rescue => e
-          $stderr.puts "[rails-ai-context] detect_seeded_models failed: #{e.message}" if ENV["DEBUG"]
-          next
         end
 
         models.sort.to_a

@@ -36,7 +36,7 @@ module RailsAiContext
 
         attachments = []
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           model_name = File.basename(path, ".rb").camelize
 
           content.scan(/has_one_attached\s+:(\w+)/).each do |match|
@@ -72,7 +72,7 @@ module RailsAiContext
         return validations unless Dir.exist?(models_dir)
 
         Dir.glob(File.join(models_dir, "**", "*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           model = File.basename(path, ".rb").camelize
           content.each_line do |line|
             if (match = line.match(/validates?\s+:(\w+),.*content_type:/))
@@ -95,7 +95,7 @@ module RailsAiContext
         return variants unless Dir.exist?(models_dir)
 
         Dir.glob(File.join(models_dir, "**", "*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           model = File.basename(path, ".rb").camelize
           content.scan(/\.variant\s*\(\s*:(\w+)/).each do |name|
             variants << { model: model, name: name[0] }
@@ -115,10 +115,7 @@ module RailsAiContext
           next false unless Dir.exist?(dir)
           Dir.glob(File.join(dir, "**/*")).any? do |f|
             next false if File.directory?(f)
-            File.read(f).match?(/direct.upload|DirectUpload|direct_upload/)
-          rescue => e
-            $stderr.puts "[rails-ai-context] detect_direct_upload failed: #{e.message}" if ENV["DEBUG"]
-            false
+            (RailsAiContext::SafeFile.read(f) || "").match?(/direct.upload|DirectUpload|direct_upload/)
           end
         end
       end

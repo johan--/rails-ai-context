@@ -125,20 +125,18 @@ module RailsAiContext
         return [] unless Dir.exist?(models_dir)
 
         Dir.glob(File.join(models_dir, "**/*.rb")).filter_map do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           if content.match?(/< ActiveSupport::CurrentAttributes|< Rails::CurrentAttributes/)
             File.basename(path, ".rb").camelize
           end
-        rescue => e
-          $stderr.puts "[rails-ai-context] detect_current_attributes failed: #{e.message}" if ENV["DEBUG"]
-          nil
         end
       end
 
       def detect_error_monitoring
         gemfile_lock = File.join(app.root, "Gemfile.lock")
         return nil unless File.exist?(gemfile_lock)
-        content = File.read(gemfile_lock)
+        content = RailsAiContext::SafeFile.read(gemfile_lock)
+        return nil unless content
 
         tools = []
         tools << "sentry" if content.include?("sentry-ruby") || content.include?("sentry-rails")
@@ -157,10 +155,12 @@ module RailsAiContext
         config = {}
         sidekiq_path = File.join(app.root, "config", "sidekiq.yml")
         if File.exist?(sidekiq_path)
-          content = File.read(sidekiq_path)
-          config[:processor] = "sidekiq"
-          config[:concurrency] = $1.to_i if content.match(/concurrency:\s*(\d+)/)
-          config[:queues] = content.scan(/-\s+(\w+)/).flatten.uniq
+          content = RailsAiContext::SafeFile.read(sidekiq_path)
+          if content
+            config[:processor] = "sidekiq"
+            config[:concurrency] = $1.to_i if content.match(/concurrency:\s*(\d+)/)
+            config[:queues] = content.scan(/-\s+(\w+)/).flatten.uniq
+          end
         end
         config.empty? ? nil : config
       rescue => e

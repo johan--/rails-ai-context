@@ -54,8 +54,8 @@ module RailsAiContext
       def detect_framework(root)
         gemfile = File.join(root, "Gemfile")
         package_json = File.join(root, "package.json")
-        gemfile_content = File.exist?(gemfile) ? (File.read(gemfile, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue "") : ""
-        pkg_content = File.exist?(package_json) ? (File.read(package_json, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue "") : ""
+        gemfile_content = File.exist?(gemfile) ? (RailsAiContext::SafeFile.read(gemfile) || "") : ""
+        pkg_content = File.exist?(package_json) ? (RailsAiContext::SafeFile.read(package_json) || "") : ""
 
         framework = if gemfile_content.include?("tailwindcss-rails")
           "tailwind"
@@ -84,7 +84,7 @@ module RailsAiContext
       # 1. Built CSS output (Tailwind v4, cssbundling-rails, dartsass-rails)
       def extract_built_css_vars(root, tokens)
         Dir.glob(File.join(root, "app", "assets", "builds", "*.css")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           extract_root_vars(content, tokens)
         end
       end
@@ -93,7 +93,7 @@ module RailsAiContext
       def extract_tailwind_v4_theme(root, tokens)
         %w[app/assets/tailwind app/assets/stylesheets].each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.css")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/@theme\s*(?:inline)?\s*\{([^}]+)\}/m).each do |match|
               match[0].scan(/--([a-zA-Z0-9-]+):\s*([^;]+);/).each do |name, value|
                 tokens["--#{name}"] = value.strip
@@ -109,7 +109,8 @@ module RailsAiContext
         path = File.join(root, "tailwind.config.js") unless File.exist?(path)
         return unless File.exist?(path)
 
-        content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue return
+        content = RailsAiContext::SafeFile.read(path)
+        return unless content
 
         # Extract ALL hex/rgb/hsl color values with their context
         # Pattern: 'key': '#hex' or "key": "rgb(...)" anywhere in file
@@ -166,7 +167,7 @@ module RailsAiContext
       def extract_scss_variables(root, tokens)
         %w[app/assets/stylesheets app/assets/stylesheets/config].each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.{scss,sass}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/^\$([a-zA-Z][\w-]*)\s*:\s*([^;!]+)/).each do |name, value|
               value = value.strip
               # Skip computed values (references to other variables, functions)
@@ -181,7 +182,7 @@ module RailsAiContext
       def extract_css_custom_properties(root, tokens)
         %w[app/assets/stylesheets].each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.css")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             extract_root_vars(content, tokens)
           end
         end
@@ -194,7 +195,7 @@ module RailsAiContext
           next unless Dir.exist?(full_dir)
 
           Dir.glob(File.join(full_dir, "**", "*.{scss,sass,css}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             # Sass variables
             content.scan(/^\$([a-zA-Z][\w-]*)\s*:\s*([^;!]+)/).each do |name, value|
               value = value.strip
@@ -213,7 +214,7 @@ module RailsAiContext
         return unless Dir.exist?(dir)
 
         Dir.glob(File.join(dir, "**", "*.css")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           extract_root_vars(content, tokens)
         end
       end
@@ -257,7 +258,7 @@ module RailsAiContext
       def extract_apply_directives(root, tokens)
         %w[app/assets/stylesheets app/assets/tailwind].each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.css")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/\.([a-zA-Z][\w-]*)\s*\{[^}]*@apply\s+([^;]+);/m).each do |name, classes|
               tokens["@apply-#{name}"] = classes.strip
             end
@@ -272,7 +273,7 @@ module RailsAiContext
         css_dirs = %w[app/assets/stylesheets app/assets/builds app/assets/tailwind]
         css_dirs.each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.{css,scss,sass}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             result[:font_face] += content.scan(/@font-face/).size
             result[:google_fonts] = true if content.include?("fonts.googleapis.com")
             result[:system_fonts] = true if content.match?(/system-ui|-apple-system/)
@@ -283,7 +284,7 @@ module RailsAiContext
         views_dir = File.join(root, "app/views")
         if Dir.exist?(views_dir)
           Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             result[:google_fonts] = true if content.include?("fonts.googleapis.com")
             result[:system_fonts] = true if content.match?(/system-ui|-apple-system/)
           end
@@ -300,7 +301,7 @@ module RailsAiContext
         css_dirs = %w[app/assets/stylesheets app/assets/builds app/assets/tailwind]
         css_dirs.each do |dir|
           Dir.glob(File.join(root, dir, "**", "*.{css,scss}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/@layer\s+([\w-]+)/).each do |match|
               layers << match[0]
             end
@@ -318,7 +319,7 @@ module RailsAiContext
           path = File.join(root, filename)
           next unless File.exist?(path)
 
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           # Match plugin names in various PostCSS config formats:
           # require('plugin-name'), 'plugin-name': {}, "plugin-name", plugins: [require('name')]
           content.scan(/require\s*\(\s*["']([^"']+)["']\)/).each { |m| plugins << m[0] }
@@ -340,7 +341,7 @@ module RailsAiContext
         return values unless Dir.exist?(views_dir)
 
         Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).first(100).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           content.scan(/\b(\w+)-\[([^\]]+)\]/).each do |prefix, _value|
             values["#{prefix}-[...]"] += 1
           end

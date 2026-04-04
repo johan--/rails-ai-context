@@ -58,7 +58,16 @@ module RailsAiContext
         /\bAKIA[0-9A-Z]{16}\b/,                          # AWS access key IDs
         /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,  # JWT tokens
         /-----BEGIN\s+(RSA|DSA|EC|OPENSSH)?\s*PRIVATE KEY-----/,       # SSH/TLS private keys
-        /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b/i
+        /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b/i,
+        /\bsk_(?:live|test)_[A-Za-z0-9]{10,}\b/,             # Stripe secret keys
+        /\brk_(?:live|test)_[A-Za-z0-9]{10,}\b/,             # Stripe restricted keys
+        /\bSG\.[A-Za-z0-9_-]{22,}\.[A-Za-z0-9_-]{10,}\b/,   # SendGrid API keys
+        /\bxox[bpras]-[A-Za-z0-9-]{10,}\b/,                  # Slack tokens
+        /\bghp_[A-Za-z0-9]{36,}\b/,                          # GitHub personal access tokens
+        /\bghu_[A-Za-z0-9]{36,}\b/,                          # GitHub user-to-server tokens
+        /\bghs_[A-Za-z0-9]{36,}\b/,                          # GitHub server-to-server tokens
+        /\bglpat-[A-Za-z0-9_-]{20,}\b/,                      # GitLab personal access tokens
+        /\bnpm_[A-Za-z0-9]{36,}\b/                           # npm tokens
       ].freeze
 
       # Lines that reveal env var names (dotenv, Figaro, etc.)

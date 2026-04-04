@@ -44,14 +44,14 @@ module RailsAiContext
 
         Dir.glob(File.join(dir, "*")).filter_map do |path|
           next unless File.file?(path)
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path)
+          unless content
+            next { name: File.basename(path) }
+          end
           yields = content.scan(/<%=?\s*(?:yield|content_for)\s*[:(]?\s*:?(\w*)/).flatten.reject(&:empty?)
           entry = { name: File.basename(path) }
           entry[:yields] = yields unless yields.empty?
           entry
-        rescue => e
-          $stderr.puts "[rails-ai-context] extract_layouts read failed: #{e.message}" if ENV["DEBUG"]
-          { name: File.basename(path) }
         end.sort_by { |l| l[:name] }
       end
 
@@ -101,7 +101,7 @@ module RailsAiContext
 
         Dir.glob(File.join(dir, "**/*.rb")).filter_map do |path|
           relative = path.sub("#{dir}/", "")
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           methods = content.scan(/^\s*def\s+(\w+)/).flatten
           {
             file: relative,
@@ -152,7 +152,7 @@ module RailsAiContext
         counts = Hash.new(0)
         view_files = Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim,rb}"))
         view_files.each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           FORM_BUILDER_PATTERNS.each do |name, pattern|
             count = content.scan(pattern).size
             counts[name] += count if count > 0
@@ -171,7 +171,7 @@ module RailsAiContext
         components = Set.new
         view_files = Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim,rb}"))
         view_files.each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           # Match render ComponentName.new(...) or render(ComponentName.new(...))
           content.scan(/render\s*\(?\s*([A-Z]\w+(?:::\w+)*(?:Component)?)\.new/).each do |match|
             components << match[0]
@@ -206,7 +206,8 @@ module RailsAiContext
         return layouts unless Dir.exist?(controllers_dir)
 
         Dir.glob(File.join(controllers_dir, "**", "*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content
           content.each_line do |line|
             if (match = line.match(/\A\s*layout\s+["':]*(\w+)["']?(.*)$/))
               entry = { layout: match[1], controller: File.basename(path, ".rb").camelize }

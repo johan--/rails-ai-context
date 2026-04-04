@@ -97,7 +97,7 @@ module RailsAiContext
 
         result = {}
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           next unless content.match?(/\bdevise\b/)
 
           model_name = File.basename(path, ".rb").camelize
@@ -134,8 +134,8 @@ module RailsAiContext
 
         devise_init = File.join(root, "config/initializers/devise.rb")
         if File.exist?(devise_init)
-          content = File.read(devise_init)
-          return { detected: true, jwt_configured: content.match?(/config\.jwt\b/) }
+          content = RailsAiContext::SafeFile.read(devise_init)
+          return { detected: true, jwt_configured: content&.match?(/config\.jwt\b/) || false }
         end
 
         { detected: true }
@@ -150,7 +150,8 @@ module RailsAiContext
         doorkeeper_init = File.join(root, "config/initializers/doorkeeper.rb")
         return { detected: true } unless File.exist?(doorkeeper_init)
 
-        content = File.read(doorkeeper_init)
+        content = RailsAiContext::SafeFile.read(doorkeeper_init)
+        return { detected: true } unless content
 
         grant_flows = content.scan(/grant_flows\s+%w\[([^\]]+)\]/).flatten.first
         grant_flows = grant_flows&.split&.map(&:strip)
@@ -171,7 +172,7 @@ module RailsAiContext
         return [] unless Dir.exist?(controllers_dir)
 
         Dir.glob(File.join(controllers_dir, "**/*.rb")).filter_map do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           if content.match?(/authenticate_with_http_token|authenticate_or_request_with_http_token/)
             path.sub("#{root}/", "")
           end
@@ -185,7 +186,7 @@ module RailsAiContext
         providers = []
         initializers = Dir.glob(File.join(app.root, "config", "initializers", "*.rb"))
         initializers.each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           content.scan(/config\.omniauth\s+:(\w+)/).each { |m| providers << m[0] }
           content.scan(/provider\s+:(\w+)/).each { |m| providers << m[0] unless %w[developer].include?(m[0]) }
         end
@@ -193,7 +194,7 @@ module RailsAiContext
         models_dir = File.join(app.root, "app", "models")
         if Dir.exist?(models_dir)
           Dir.glob(File.join(models_dir, "**", "*.rb")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/omniauth_providers:\s*\[([^\]]+)\]/).each do |m|
               m[0].scan(/:(\w+)/).each { |p| providers << p[0] }
             end
@@ -208,7 +209,9 @@ module RailsAiContext
       def extract_devise_settings
         path = File.join(app.root, "config", "initializers", "devise.rb")
         return {} unless File.exist?(path)
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return {} unless content
+
         settings = {}
         settings[:timeout_in] = $1 if content.match(/config\.timeout_in\s*=\s*(\S+)/)
         settings[:lock_strategy] = $1 if content.match(/config\.lock_strategy\s*=\s*:(\w+)/)
@@ -227,7 +230,7 @@ module RailsAiContext
 
         results = []
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           matches = content.scan(pattern)
           next if matches.empty?
 
@@ -243,7 +246,10 @@ module RailsAiContext
       def gem_present?(name)
         lock_path = File.join(root, "Gemfile.lock")
         return false unless File.exist?(lock_path)
-        File.read(lock_path).include?("    #{name} (")
+        content = RailsAiContext::SafeFile.read(lock_path)
+        return false unless content
+
+        content.include?("    #{name} (")
       rescue => e
         $stderr.puts "[rails-ai-context] gem_present? failed: #{e.message}" if ENV["DEBUG"]
         false

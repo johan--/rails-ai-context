@@ -43,6 +43,7 @@ module RailsAiContext
         sections << middleware_section if context[:middleware]
         sections << engines_section if context[:engines]
         sections << multi_database_section if context[:multi_database]
+        sections << warnings_section if context[:_warnings]&.any?
         sections << footer
         sections.compact.join("\n\n")
       end
@@ -83,7 +84,7 @@ module RailsAiContext
         lines = [ "## Database Schema (#{schema[:total_tables]} tables)" ]
         schema[:tables]&.each do |name, data|
           cols = (data[:columns] || []).map { |c| "`#{c[:name]}` (#{c[:type]})" }.join(", ")
-          lines << "### #{name}"
+          lines << "### #{MarkdownEscape.escape(name)}"
           lines << cols
         end
         lines.join("\n\n")
@@ -97,7 +98,7 @@ module RailsAiContext
         models.each do |name, data|
           next if data[:error]
           assocs = (data[:associations] || []).map { |a| "#{a[:type]} :#{a[:name]}" }.join(", ")
-          lines << "### #{name}"
+          lines << "### #{MarkdownEscape.escape(name)}"
           lines << "- Table: `#{data[:table_name]}`" if data[:table_name]
           lines << "- Associations: #{assocs}" if assocs.present?
           if data[:validations]&.any?
@@ -115,7 +116,7 @@ module RailsAiContext
 
         lines = [ "## Routes (#{routes[:total_routes]} total)" ]
         routes[:by_controller]&.sort&.each do |ctrl, actions|
-          lines << "### #{ctrl}"
+          lines << "### #{MarkdownEscape.escape(ctrl)}"
           actions.each do |r|
             lines << "- `#{r[:verb]} #{r[:path]}` → #{r[:action]}"
           end
@@ -181,7 +182,7 @@ module RailsAiContext
         lines = [ "## Controllers (#{controllers.size})" ]
         controllers.each do |name, info|
           next if info[:error]
-          lines << "### #{name}"
+          lines << "### #{MarkdownEscape.escape(name)}"
           lines << "- Parent: `#{info[:parent_class]}`" if info[:parent_class]
           lines << "- API controller: yes" if info[:api_controller]
           lines << "- Actions: #{info[:actions]&.join(', ')}" if info[:actions]&.any?
@@ -496,6 +497,19 @@ module RailsAiContext
           end
         end
 
+        lines.join("\n")
+      end
+
+      def warnings_section
+        warnings = context[:_warnings]
+        return if warnings.nil? || warnings.empty?
+
+        lines = [ "## Warnings", "" ]
+        lines << "The following sections were unavailable during introspection:"
+        lines << ""
+        warnings.each do |w|
+          lines << "- **#{w[:introspector]}**: #{w[:error]}"
+        end
         lines.join("\n")
       end
 

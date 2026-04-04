@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.2] — 2026-04-04
+
+### Fixed
+- **Middleware crash protection** — MCP HTTP middleware now rescues exceptions and returns a proper JSON-RPC 2.0 error (`-32603 Internal error`) instead of crashing the Rails request pipeline
+- **File read size limits** — Added `SafeFile.read` helper with automatic size checks; replaced 150+ unguarded `File.read` calls across all introspectors and tools to prevent OOM on oversized files
+- **Cache race condition** — `BaseTool.cached_context` now returns a `deep_dup` of the shared cache, preventing concurrent MCP requests from mutating shared data structures
+- **Silent failure warnings** — Introspector failures now propagate as `_warnings` to serializer output; AI clients see a `## Warnings` section listing which sections were unavailable and why
+- **Markdown escaping** — Dynamic content (model names, table names, controller names) in generated markdown is now escaped to prevent formatting corruption from special characters
+
+### Added
+- `RailsAiContext::SafeFile` module — safe file reading with configurable size limits, encoding handling, and error suppression
+- `RailsAiContext::MarkdownEscape` module — escapes markdown special characters in dynamic content interpolated into headings and prose
+
 ## [4.4.0] — 2026-04-03
 
 ### Added

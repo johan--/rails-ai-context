@@ -33,7 +33,8 @@ module RailsAiContext
         path = File.join(root, "config/puma.rb")
         return nil unless File.exist?(path)
 
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return nil unless content
         config = {}
 
         if (threads_match = content.match(/threads\s+(\d+)\s*,\s*(\d+)/))
@@ -60,7 +61,7 @@ module RailsAiContext
           path = File.join(root, filename)
           next unless File.exist?(path)
 
-          entries = File.readlines(path).filter_map do |line|
+          entries = (RailsAiContext::SafeFile.read(path) || "").lines.filter_map do |line|
             line.strip!
             next if line.empty? || line.start_with?("#")
             parts = line.split(":", 2)
@@ -75,7 +76,8 @@ module RailsAiContext
         routes_path = File.join(root, "config/routes.rb")
         return nil unless File.exist?(routes_path)
 
-        content = File.read(routes_path)
+        content = RailsAiContext::SafeFile.read(routes_path)
+        return nil unless content
         return true if content.match?(/\b(?:health|up|ping|status)\b/)
         nil
       rescue => e
@@ -87,7 +89,8 @@ module RailsAiContext
         dockerfile = File.join(root, "Dockerfile")
         return nil unless File.exist?(dockerfile)
 
-        content = File.read(dockerfile)
+        content = RailsAiContext::SafeFile.read(dockerfile)
+        return nil unless content
         info = {}
 
         from_lines = content.scan(/^FROM\s+(.+)/)

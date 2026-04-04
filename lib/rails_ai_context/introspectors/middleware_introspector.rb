@@ -35,7 +35,7 @@ module RailsAiContext
         return [] unless Dir.exist?(middleware_dir)
 
         Dir.glob(File.join(middleware_dir, "**/*.rb")).sort.map do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           class_name = File.basename(path, ".rb").camelize
 
           info = {
@@ -87,7 +87,7 @@ module RailsAiContext
 
         additions = []
         Dir.glob(File.join(init_dir, "*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           content.scan(/config\.middleware\.(?:use|insert_before|insert_after|insert|unshift)\s+(\S+)/).each do |match|
             name = match[0].gsub(/,.*/, "").strip
             additions << { middleware: name, file: File.basename(path) } unless name.empty?

@@ -36,13 +36,13 @@ module RailsAiContext
             ttl = RailsAiContext.configuration.cache_ttl
 
             if SHARED_CACHE[:context] && (now - SHARED_CACHE[:timestamp]) < ttl && !Fingerprinter.changed?(rails_app, SHARED_CACHE[:fingerprint])
-              return SHARED_CACHE[:context]
+              return SHARED_CACHE[:context].deep_dup
             end
 
             SHARED_CACHE[:context] = RailsAiContext.introspect
             SHARED_CACHE[:timestamp] = now
             SHARED_CACHE[:fingerprint] = Fingerprinter.compute(rails_app)
-            SHARED_CACHE[:context]
+            SHARED_CACHE[:context].deep_dup
           end
         end
 

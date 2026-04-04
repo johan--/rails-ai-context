@@ -76,7 +76,7 @@ module RailsAiContext
           return text_response("File too large: #{file}")
         end
 
-        source_lines = File.readlines(full_path)
+        source_lines = (RailsAiContext::SafeFile.read(full_path) || "").lines
         context_lines = [ context_lines.to_i, 0 ].max
 
         # Find all matching lines

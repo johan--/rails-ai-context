@@ -98,7 +98,8 @@ module RailsAiContext
           return text_response("Concern file too large: #{file_path} (#{File.size(file_path)} bytes, max: #{max_size})")
         end
 
-        source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(file_path)
+        return text_response("Could not read concern file: #{file_path}") unless source
         relative_path = file_path.sub("#{root}/", "")
 
         lines = [ "# #{name}", "" ]
@@ -207,7 +208,7 @@ module RailsAiContext
 
             method_count = 0
             if File.size(file_path) <= max_size
-              source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue nil
+              source = RailsAiContext::SafeFile.read(file_path)
               if source
                 public_methods = parse_public_methods(source)
                 class_methods = parse_class_methods(source)
@@ -442,7 +443,7 @@ module RailsAiContext
             next if file_path.include?("/concerns/")
             next if File.size(file_path) > max_size
 
-            source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+            source = RailsAiContext::SafeFile.read(file_path) or next
             if source.match?(pattern)
               # Extract the class/module name from the file
               class_match = source.match(/^\s*class\s+(\S+)/) || source.match(/^\s*module\s+(\S+)/)

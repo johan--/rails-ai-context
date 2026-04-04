@@ -96,7 +96,8 @@ module RailsAiContext
         cors_path = File.join(root, "config/initializers/cors.rb")
         return nil unless File.exist?(cors_path)
 
-        content = File.read(cors_path)
+        content = RailsAiContext::SafeFile.read(cors_path)
+        return nil unless content
         origins = content.scan(/origins\s+(.+)$/).flatten.flat_map do |line|
           line.scan(/["']([^"']+)["']/).flatten
         end
@@ -111,7 +112,8 @@ module RailsAiContext
         package_path = File.join(root, "package.json")
         return [] unless File.exist?(package_path)
 
-        content = File.read(package_path, encoding: "bom|utf-8")
+        content = RailsAiContext::SafeFile.read(package_path)
+        return [] unless content
         codegen_tools = %w[openapi-typescript @graphql-codegen/cli orval]
 
         codegen_tools.select { |tool| content.include?(%("#{tool}")) }
@@ -137,7 +139,8 @@ module RailsAiContext
       def detect_pagination
         gemfile_lock = File.join(app.root, "Gemfile.lock")
         return nil unless File.exist?(gemfile_lock)
-        content = File.read(gemfile_lock)
+        content = RailsAiContext::SafeFile.read(gemfile_lock)
+        return nil unless content
 
         strategies = []
         strategies << "pagy" if content.include?("pagy")
@@ -159,11 +162,8 @@ module RailsAiContext
         controllers_dir = File.join(root, "app/controllers")
         if Dir.exist?(controllers_dir)
           Dir.glob(File.join(controllers_dir, "**/*.rb")).each do |path|
-            content = File.read(path)
+            content = RailsAiContext::SafeFile.read(path) or next
             return { rails_rate_limiting: true } if content.match?(/rate_limit\b/)
-          rescue => e
-            $stderr.puts "[rails-ai-context] detect_rate_limiting failed: #{e.message}" if ENV["DEBUG"]
-            next
           end
         end
 

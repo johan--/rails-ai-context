@@ -199,10 +199,10 @@ module RailsAiContext
         files.each do |path|
           relative = "layouts/#{File.basename(path)}"
           if detail == "full"
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue "(error reading)"
+            content = RailsAiContext::SafeFile.read(path) || "(error reading)"
             lines << "## #{relative}" << "```erb" << strip_svg(content) << "```" << ""
           else
-            line_count = (File.readlines(path).size rescue 0)
+            line_count = (RailsAiContext::SafeFile.read(path) || "").lines.size
             lines << "- #{relative} (#{line_count} lines)"
           end
         end
@@ -240,7 +240,9 @@ module RailsAiContext
           return text_response("File too large: #{path} (#{File.size(full_path)} bytes, max: #{max_file_size})")
         end
 
-        content = compress_tailwind(strip_svg(File.read(full_path)))
+        content = RailsAiContext::SafeFile.read(full_path)
+        return text_response("Could not read file: #{path}") unless content
+        content = compress_tailwind(strip_svg(content))
         text_response("# #{path}\n\n```erb\n#{content}\n```")
       end
 
@@ -279,7 +281,7 @@ module RailsAiContext
 
       private_class_method def self.read_view_content(relative_path)
         full_path = Rails.root.join("app", "views", relative_path)
-        File.exist?(full_path) ? File.read(full_path) : "(file not found)"
+        File.exist?(full_path) ? (RailsAiContext::SafeFile.read(full_path) || "(error reading file)") : "(file not found)"
       rescue => e
         $stderr.puts "[rails-ai-context] read_view_content failed: #{e.message}" if ENV["DEBUG"]
         "(error reading file)"

@@ -44,8 +44,8 @@ module RailsAiContext
             version = filename.split("_").first
             name = filename.sub(/\A\d+_/, "").tr("_", " ").capitalize
 
-            content = File.read(path)
-            actions = detect_migration_actions(content)
+            content = RailsAiContext::SafeFile.read(path)
+            actions = content ? detect_migration_actions(content) : []
 
             {
               version: version,
@@ -90,7 +90,8 @@ module RailsAiContext
         schema_path = File.join(root, "db/schema.rb")
         return nil unless File.exist?(schema_path)
 
-        content = File.read(schema_path)
+        content = RailsAiContext::SafeFile.read(schema_path)
+        return nil unless content
         match = content.match(/version:\s*([\d_]+)/)
         match ? match[1].delete("_") : nil
       rescue => e

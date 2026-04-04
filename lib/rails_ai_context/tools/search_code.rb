@@ -263,7 +263,7 @@ module RailsAiContext
           next if ai_context_files.any? { |p| relative.start_with?(p) || relative == p }
           next if exclude_tests && test_dirs.any? { |td| relative.start_with?(td) }
 
-          File.readlines(file).each_with_index do |line, idx|
+          (RailsAiContext::SafeFile.read(file) || "").lines.each_with_index do |line, idx|
             if line.match?(regex)
               results << { file: relative, line_number: idx + 1, content: line }
               return results if results.size >= max_results
@@ -446,7 +446,7 @@ module RailsAiContext
       # Extract class/module context for a line
       private_class_method def self.extract_class_context(file_path, line_num)
         return nil unless File.exist?(file_path)
-        lines = File.readlines(file_path)
+        lines = (RailsAiContext::SafeFile.read(file_path) || "").lines
         # Walk backwards from the method to find the enclosing class/module
         (line_num - 2).downto(0) do |i|
           if lines[i]&.match?(/\A\s*(class|module)\s+(\S+)/)
@@ -463,7 +463,8 @@ module RailsAiContext
       private_class_method def self.extract_sibling_methods(file_path, def_line, exclude_method)
         return [] unless File.exist?(file_path)
         return [] if File.size(file_path) > RailsAiContext.configuration.max_file_size
-        source = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(file_path)
+        return [] unless source
         methods = []
         in_private = false
         source.each_line do |line|
@@ -511,7 +512,7 @@ module RailsAiContext
         return nil unless File.exist?(file_path)
         return nil if File.size(file_path) > RailsAiContext.configuration.max_file_size
 
-        source_lines = File.readlines(file_path)
+        source_lines = (RailsAiContext::SafeFile.read(file_path) || "").lines
         start_idx = def_line - 1
         return nil if start_idx >= source_lines.size
 

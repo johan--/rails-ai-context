@@ -228,7 +228,8 @@ module RailsAiContext
             next
           end
           next if File.size(path) > max_test_file_size
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content
 
           # Summary/standard: return just test names (saves 2000+ tokens vs full source)
           if detail == "summary" || detail == "standard"
@@ -284,7 +285,7 @@ module RailsAiContext
           test_dir = Rails.root.join("test")
           if Dir.exist?(test_dir)
             Dir.glob(File.join(test_dir, "**/*_test.rb")).first(5).each do |path|
-              content = File.read(path, encoding: "UTF-8") rescue next
+              content = RailsAiContext::SafeFile.read(path) or next
               has_devise = true if content.include?("Devise::Test")
               has_sign_in = true if content.include?("sign_in")
             end
@@ -351,7 +352,8 @@ module RailsAiContext
         return nil unless path
         return nil if File.size(path) > max_test_file_size
 
-        content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        content = RailsAiContext::SafeFile.read(path)
+        return nil unless content
         lines = []
         current_factory = nil
 
@@ -379,7 +381,8 @@ module RailsAiContext
         return {} if File.size(file_path) > max_test_file_size
 
         require "yaml"
-        content = File.read(file_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        content = RailsAiContext::SafeFile.read(file_path)
+        return {} unless content
         # Handle ERB-templated fixtures: replace "<%=...%>" (with surrounding quotes) and bare <%...%>
         content = content.gsub(/"<%=.*?%>"/, '"erb_value"')
         content = content.gsub(/'<%=.*?%>'/, "'erb_value'")

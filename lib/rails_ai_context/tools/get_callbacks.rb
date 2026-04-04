@@ -234,7 +234,7 @@ module RailsAiContext
         return nil unless File.exist?(path)
         return nil if File.size(path) > RailsAiContext.configuration.max_file_size
 
-        source_lines = File.readlines(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source_lines = (RailsAiContext::SafeFile.read(path) || "").lines
         method_str = method_name.to_s
 
         # Find method definition (could be public or private)
@@ -280,7 +280,7 @@ module RailsAiContext
           next unless concern_path
           next if File.size(concern_path) > max_size
 
-          source = File.read(concern_path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          source = RailsAiContext::SafeFile.read(concern_path) or next
           callbacks = []
 
           source.each_line do |line|

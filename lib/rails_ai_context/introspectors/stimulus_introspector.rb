@@ -43,7 +43,8 @@ module RailsAiContext
       def parse_controller(path, base_dir)
         relative = path.sub("#{base_dir}/", "")
         name = relative.sub(/_controller\.(js|ts)\z/, "").tr("/", "--")
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return { name: File.basename(path), error: "unreadable" } unless content
 
         outlets = extract_outlets(content)
 
@@ -181,7 +182,7 @@ module RailsAiContext
         view_dirs.each do |dir|
           next unless Dir.exist?(dir)
           Dir.glob(File.join(dir, "**", "*.{erb,haml,slim}")).each do |path|
-            content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+            content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/data-action=["']([^"']+)["']/).each do |match|
               match[0].split(/\s+/).each do |binding_str|
                 # Format: event->controller#method
@@ -207,7 +208,7 @@ module RailsAiContext
 
         compositions = []
         Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim}")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           relative = path.sub("#{views_dir}/", "")
 
           content.scan(/data-controller=["']([^"']+)["']/).each do |match|

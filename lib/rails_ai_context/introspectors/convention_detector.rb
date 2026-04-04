@@ -73,19 +73,15 @@ module RailsAiContext
         model_dir = File.join(root, "app/models")
         if Dir.exist?(model_dir)
           model_files = Dir.glob(File.join(model_dir, "**/*.rb"))
-          content = model_files.first(500).map { |f| File.read(f) rescue "" }.join("\n")
+          content = model_files.first(500).map { |f| RailsAiContext::SafeFile.read(f) || "" }.join("\n")
 
           # STI: explicit inheritance_column, or a model that inherits from another app model
           # with a `type` column (verified via schema.rb or model source)
           app_model_names = model_files.filter_map { |f| File.basename(f, ".rb").camelize }
-          schema_content = begin
-            schema_path = File.join(root, "db/schema.rb")
-            File.exist?(schema_path) ? File.read(schema_path) : ""
-          rescue
-            ""
-          end
+          schema_path = File.join(root, "db/schema.rb")
+          schema_content = File.exist?(schema_path) ? (RailsAiContext::SafeFile.read(schema_path) || "") : ""
           has_sti_subclass = model_files.any? do |f|
-            src = File.read(f) rescue ""
+            src = RailsAiContext::SafeFile.read(f) || ""
             parent_match = src.match(/class\s+\w+\s*<\s*(\w+)/)
             next false unless parent_match && app_model_names.include?(parent_match[1]) && parent_match[1] != "ApplicationRecord"
             # Verify parent's table has a `type` column
@@ -184,7 +180,7 @@ module RailsAiContext
       def gem_present?(name)
         lock_path = File.join(root, "Gemfile.lock")
         return false unless File.exist?(lock_path)
-        File.read(lock_path).include?("    #{name} (")
+        (RailsAiContext::SafeFile.read(lock_path) || "").include?("    #{name} (")
       end
     end
   end

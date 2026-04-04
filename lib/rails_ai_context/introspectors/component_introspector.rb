@@ -44,7 +44,8 @@ module RailsAiContext
       end
 
       def parse_component(path)
-        content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        content = RailsAiContext::SafeFile.read(path)
+        return nil unless content
         relative = path.sub("#{root}/", "")
         class_name = extract_class_name(content)
         return nil unless class_name
@@ -115,7 +116,7 @@ module RailsAiContext
         return bases unless Dir.exist?(components_dir)
 
         Dir.glob(File.join(components_dir, "**/*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           if content.match?(/< (Phlex::HTML|Phlex::SVG)\b/)
             match = content.match(/class\s+(\S+)\s*</)
             bases << match[1] if match

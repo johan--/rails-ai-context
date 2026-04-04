@@ -84,7 +84,8 @@ module RailsAiContext
 
       # Extract details purely from source file (for controllers not loaded as classes)
       def extract_details_from_source(path)
-        source = File.read(path)
+        source = RailsAiContext::SafeFile.read(path)
+        return { error: "unreadable" } unless source
         parent = source.match(/class\s+\S+\s*<\s*(\S+)/)&.send(:[], 1) || "Unknown"
         rate_limit_raw = extract_rate_limit(source)
         details = {
@@ -407,10 +408,7 @@ module RailsAiContext
       def read_source(ctrl)
         path = source_path(ctrl)
         return nil unless path && File.exist?(path)
-        File.read(path)
-      rescue => e
-        $stderr.puts "[rails-ai-context] read_source failed: #{e.message}" if ENV["DEBUG"]
-        nil
+        RailsAiContext::SafeFile.read(path)
       end
 
       def source_path(ctrl)

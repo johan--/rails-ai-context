@@ -26,7 +26,8 @@ module RailsAiContext
       private
 
       def parse_rake_file(path, base_dir)
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return [ { file: path.sub("#{base_dir}/", ""), error: "unreadable" } ] unless content
         relative = path.sub("#{base_dir}/", "")
         tasks = []
         last_desc = nil

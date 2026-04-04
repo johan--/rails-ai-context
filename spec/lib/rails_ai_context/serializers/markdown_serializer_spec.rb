@@ -24,6 +24,34 @@ RSpec.describe RailsAiContext::Serializers::MarkdownSerializer do
     it "includes routes section" do
       expect(output).to include("## Routes")
     end
+
+    context "with introspector warnings" do
+      let(:context) do
+        ctx = RailsAiContext.introspect
+        ctx[:_warnings] = [
+          { introspector: "database_stats", error: "Database connection failed" }
+        ]
+        ctx
+      end
+
+      it "renders a Warnings section" do
+        expect(output).to include("## Warnings")
+        expect(output).to include("**database_stats**")
+        expect(output).to include("Database connection failed")
+      end
+    end
+
+    context "without warnings" do
+      let(:context) do
+        ctx = RailsAiContext.introspect
+        ctx.delete(:_warnings)
+        ctx
+      end
+
+      it "does not render a Warnings section" do
+        expect(output).not_to include("## Warnings")
+      end
+    end
   end
 end
 
@@ -44,6 +72,21 @@ RSpec.describe RailsAiContext::Serializers::ClaudeSerializer do
 
       it "includes rules section" do
         expect(output).to include("## Rules")
+      end
+
+      context "with introspector warnings" do
+        let(:context) do
+          ctx = RailsAiContext.introspect
+          ctx[:_warnings] = [
+            { introspector: "schema", error: "No database" }
+          ]
+          ctx
+        end
+
+        it "renders warnings in compact mode" do
+          expect(output).to include("## Warnings")
+          expect(output).to include("**schema** skipped")
+        end
       end
     end
 

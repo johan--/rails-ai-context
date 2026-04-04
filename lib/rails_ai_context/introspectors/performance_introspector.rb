@@ -38,7 +38,8 @@ module RailsAiContext
         schema_path = File.join(root, "db/schema.rb")
         return {} unless File.exist?(schema_path)
 
-        content = File.read(schema_path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        content = RailsAiContext::SafeFile.read(schema_path)
+        return {} unless content
         tables = {}
 
         current_table = nil
@@ -76,8 +77,8 @@ module RailsAiContext
         return [] unless Dir.exist?(models_dir)
 
         Dir.glob(File.join(models_dir, "**/*.rb")).filter_map do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-          next unless content.match?(/< ApplicationRecord/)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content&.match?(/< ApplicationRecord/)
 
           class_name = content.match(/class\s+(\w+)/)[1] rescue nil
           next unless class_name
@@ -108,7 +109,8 @@ module RailsAiContext
         view_contents = preload_view_contents
 
         Dir.glob(File.join(controllers_dir, "**/*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content
           relative = path.sub("#{root}/", "")
 
           model_data.each do |model|
@@ -144,9 +146,7 @@ module RailsAiContext
         return [] unless Dir.exist?(views_dir)
 
         Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim}")).filter_map do |path|
-          File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-        rescue StandardError
-          nil
+          RailsAiContext::SafeFile.read(path)
         end
       end
 
@@ -238,12 +238,9 @@ module RailsAiContext
         models_dir = File.join(root, "app/models")
         model_names = if Dir.exist?(models_dir)
           Dir.glob(File.join(models_dir, "**/*.rb")).filter_map do |path|
-            content = File.read(path)
+            content = RailsAiContext::SafeFile.read(path) or next
             match = content.match(/class\s+(\w+)\s*<\s*ApplicationRecord/)
             match[1] if match
-          rescue => e
-            $stderr.puts "[rails-ai-context] detect_model_all_in_controllers failed: #{e.message}" if ENV["DEBUG"]
-            nil
           end
         else
           []
@@ -256,7 +253,8 @@ module RailsAiContext
         combined_pattern = /(#{escaped_names.join("|")})\.all\b/
 
         Dir.glob(File.join(controllers_dir, "**/*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content
           relative = path.sub("#{root}/", "")
 
           content.scan(combined_pattern).each do |match|
@@ -281,8 +279,8 @@ module RailsAiContext
         return candidates unless Dir.exist?(models_dir)
 
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
-          next unless content.match?(/< ApplicationRecord/)
+          content = RailsAiContext::SafeFile.read(path)
+          next unless content&.match?(/< ApplicationRecord/)
 
           class_name = content.match(/class\s+(\w+)/)[1] rescue next
           has_many_assocs = content.scan(/has_many\s+:(\w+)/).flatten

@@ -383,7 +383,8 @@ module RailsAiContext
         path = Rails.root.join("app", "models", "#{model_name.underscore}.rb")
         return {} unless File.exist?(path) && File.size(path) <= max_file_size
 
-        source = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(path)
+        return {} unless source
         bodies = {}
         method_names.each do |name|
           # Find the method body
@@ -404,7 +405,8 @@ module RailsAiContext
         return nil unless File.exist?(path)
         return nil if File.size(path) > max_file_size
 
-        source = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(path)
+        return nil unless source
         methods = []
         pattern = class_methods ? /\A\s*def\s+self\.(\w+[?!]?(?:\([^)]*\))?)/ : /\A\s*def\s+((?!self\.)[\w?!]+(?:\([^)]*\))?)/
 
@@ -426,7 +428,8 @@ module RailsAiContext
         return nil unless File.exist?(path)
         return nil if File.size(path) > max_file_size
 
-        source = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(path)
+        return nil unless source
         signatures = []
         in_private = false
 
@@ -457,7 +460,8 @@ module RailsAiContext
         return nil unless path
         return nil if File.size(path) > max_size
 
-        source = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+        source = RailsAiContext::SafeFile.read(path)
+        return nil unless source
         methods = []
         in_private = false
 
@@ -487,7 +491,7 @@ module RailsAiContext
         return nil unless File.exist?(full_path)
         return nil if File.size(full_path) > max_file_size
 
-        source_lines = File.readlines(full_path)
+        source_lines = (RailsAiContext::SafeFile.read(full_path) || "").lines
         sections = []
         current_section = nil
         current_start = nil

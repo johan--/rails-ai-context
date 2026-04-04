@@ -173,7 +173,8 @@ module RailsAiContext
         gemfile = File.join(app.root, "Gemfile")
         return [] unless File.exist?(gemfile)
 
-        content = File.read(gemfile)
+        content = RailsAiContext::SafeFile.read(gemfile)
+        return [] unless content
         local = []
         content.each_line do |line|
           next if line.strip.start_with?("#")
@@ -193,7 +194,8 @@ module RailsAiContext
         gemfile = File.join(app.root, "Gemfile")
         return {} unless File.exist?(gemfile)
 
-        content = File.read(gemfile)
+        content = RailsAiContext::SafeFile.read(gemfile)
+        return {} unless content
         groups = {}
         current_group = nil
         content.each_line do |line|
@@ -217,7 +219,7 @@ module RailsAiContext
         gems = {}
         in_gems = false
 
-        File.readlines(path).each do |line|
+        (RailsAiContext::SafeFile.read(path) || "").lines.each do |line|
           if line.strip == "GEM"
             in_gems = true
             next

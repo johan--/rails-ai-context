@@ -66,8 +66,8 @@ module RailsAiContext
         database_yml = File.join(root, "config/database.yml")
         return nil unless File.exist?(database_yml)
 
-        content = File.read(database_yml)
-        return nil unless content.match?(/shard/i)
+        content = RailsAiContext::SafeFile.read(database_yml)
+        return nil unless content&.match?(/shard/i)
 
         result = { detected: true }
         # Extract shard names from database.yml
@@ -78,7 +78,7 @@ module RailsAiContext
         models_dir = File.join(root, "app/models")
         if Dir.exist?(models_dir)
           Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-            src = File.read(path) rescue next
+            src = RailsAiContext::SafeFile.read(path) or next
             if (match = src.match(/connects_to\s+.*shards:\s*\{([^}]+)\}/m))
               shard_keys = match[1].scan(/(\w+):/).flatten
               result[:shard_keys] = shard_keys if shard_keys.any?
@@ -100,7 +100,7 @@ module RailsAiContext
 
         connections = []
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           model_name = File.basename(path, ".rb").camelize
 
           if (match = content.match(/connects_to\s+(.*?\n(?:\s+.*\n)*)/m))
@@ -126,7 +126,8 @@ module RailsAiContext
         path = File.join(root, "config/database.yml")
         return [] unless File.exist?(path)
 
-        content = File.read(path)
+        content = RailsAiContext::SafeFile.read(path)
+        return [] unless content
         databases = []
         current_env = defined?(Rails) ? Rails.env : "development"
         in_env = false

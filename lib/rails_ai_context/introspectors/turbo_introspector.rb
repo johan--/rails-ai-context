@@ -41,7 +41,7 @@ module RailsAiContext
 
         frames = []
         Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim}")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           relative = path.sub("#{views_dir}/", "")
 
           content.each_line do |line|
@@ -72,7 +72,7 @@ module RailsAiContext
         return actions unless Dir.exist?(views_dir)
 
         Dir.glob(File.join(views_dir, "**", "*.turbo_stream.erb")).each do |path|
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace)
+          content = RailsAiContext::SafeFile.read(path) or next
           content.scan(/turbo_stream\.(\w+)/).each { |action| actions[action[0]] += 1 }
           content.scan(/<turbo-stream\s+action=["'](\w+)["']/).each { |action| actions[action[0]] += 1 }
         end
@@ -88,7 +88,7 @@ module RailsAiContext
 
         broadcasts = []
         Dir.glob(File.join(models_dir, "**/*.rb")).each do |path|
-          content = File.read(path)
+          content = RailsAiContext::SafeFile.read(path) or next
           model_name = File.basename(path, ".rb").camelize
 
           broadcast_methods = content.scan(/\b(broadcasts_to|broadcasts_refreshes_to|broadcasts)\b/).flatten.uniq
@@ -108,7 +108,7 @@ module RailsAiContext
         return false unless Dir.exist?(layouts_dir)
 
         Dir.glob(File.join(layouts_dir, "*.{erb,haml,slim}")).any? do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           content.include?('name="turbo-refresh-method"') && content.include?('content="morph"')
         end
       rescue => e
@@ -121,7 +121,7 @@ module RailsAiContext
 
         elements = []
         Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim}")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           relative = path.sub("#{views_dir}/", "")
 
           content.scan(/<[^>]*data-turbo-permanent[^>]*>/i).each do |tag|
@@ -134,7 +134,7 @@ module RailsAiContext
         layouts_dir = File.join(root, "app/views/layouts")
         if Dir.exist?(layouts_dir)
           Dir.glob(File.join(layouts_dir, "*.{erb,haml,slim}")).each do |path|
-            content = File.read(path) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             relative = "layouts/#{File.basename(path)}"
 
             content.scan(/<[^>]*data-turbo-permanent[^>]*>/i).each do |tag|
@@ -160,7 +160,7 @@ module RailsAiContext
 
         all_dirs.each do |dir|
           Dir.glob(File.join(dir, "**/*.{erb,haml,slim}")).each do |path|
-            content = File.read(path) rescue next
+            content = RailsAiContext::SafeFile.read(path) or next
             counts[:"data-turbo-false"] += content.scan(/data-turbo=["']false["']/).size
             counts[:"data-turbo-action"] += content.scan(/data-turbo-action=["'][^"']*["']/).size
             # Also count Rails data hash syntax: data: { turbo_action: ... }
@@ -193,7 +193,7 @@ module RailsAiContext
         return false unless Dir.exist?(controllers_dir)
 
         Dir.glob(File.join(controllers_dir, "**/*.rb")).any? do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           content.match?(/include\s+Turbo::Native::Navigation/)
         end
       rescue => e
@@ -205,7 +205,7 @@ module RailsAiContext
         return [] unless Dir.exist?(controllers_dir)
 
         Dir.glob(File.join(controllers_dir, "**/*.rb")).filter_map do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           if content.match?(/turbo_native_app\?|hotwire_native_app\?/)
             path.sub("#{root}/", "")
           end
@@ -226,7 +226,7 @@ module RailsAiContext
 
         results = []
         Dir.glob(File.join(controllers_dir, "**/*.rb")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           relative = path.sub("#{root}/", "")
 
           content.scan(pattern).each do |match|
@@ -245,7 +245,7 @@ module RailsAiContext
 
         count = 0
         Dir.glob(File.join(views_dir, "**/*.{erb,haml,slim}")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           count += content.scan(/turbo_native_app\?|hotwire_native_app\?/).size
         end
 
@@ -261,7 +261,7 @@ module RailsAiContext
 
         responses = []
         Dir.glob(File.join(controllers_dir, "**/*.rb")).each do |path|
-          content = File.read(path) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           controller_name = File.basename(path, ".rb").camelize
 
           # Parse action names by tracking def ... end blocks

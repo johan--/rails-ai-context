@@ -39,7 +39,7 @@ module RailsAiContext
           next if path.include?("/layouts/")
 
           relative = path.sub("#{views_dir}/", "")
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
 
           slots = extract_slot_refs(content)
 
@@ -72,7 +72,7 @@ module RailsAiContext
         Dir.glob(File.join(views_dir, "**", "_*")).each do |path|
           next if File.directory?(path)
           relative = path.sub("#{views_dir}/", "")
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           partials[relative] = {
             lines: content.lines.count,
             fields: extract_model_fields(content),
@@ -90,7 +90,7 @@ module RailsAiContext
           next if File.directory?(path)
           next if File.size(path) > max_single
           break if content.bytesize >= max_total
-          content << (File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue "")
+          content << (RailsAiContext::SafeFile.read(path) || "")
         end
         content
       end
@@ -620,7 +620,7 @@ module RailsAiContext
           next if File.size(path) > max_file
 
           relative = path.sub("#{views_dir}/", "")
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
 
           page_type = classify_template(content)
           next unless page_type
@@ -703,7 +703,7 @@ module RailsAiContext
 
         Dir.glob(File.join(shared_dir, "_*.{erb,haml,slim}")).sort.map do |path|
           name = File.basename(path)
-          content = File.read(path, encoding: "UTF-8", invalid: :replace, undef: :replace) rescue ""
+          content = RailsAiContext::SafeFile.read(path) || ""
           description = infer_partial_description(name, content)
           { name: name, lines: content.lines.size, description: description }
         end

@@ -197,7 +197,7 @@ module RailsAiContext
         # pnpm workspaces
         pnpm_ws = File.join(root, "pnpm-workspace.yaml")
         if File.exist?(pnpm_ws)
-          data = YAML.safe_load(File.read(pnpm_ws, encoding: "bom|utf-8"), permitted_classes: []) rescue nil
+          data = YAML.safe_load(RailsAiContext::SafeFile.read(pnpm_ws) || "", permitted_classes: []) rescue nil
           if data.is_a?(Hash) && data["packages"].is_a?(Array)
             result[:detected] = true
             result[:tool] = "pnpm"
@@ -268,7 +268,7 @@ module RailsAiContext
           path = File.join(root, filename)
           next unless File.exist?(path)
 
-          content = File.read(path, encoding: "bom|utf-8") rescue next
+          content = RailsAiContext::SafeFile.read(path) or next
           VITE_IMPORT_MARKERS.each do |source, sym|
             found << sym if content.match?(/from\s+['"]#{Regexp.escape(source)}['"]/)
           end
@@ -344,7 +344,9 @@ module RailsAiContext
         path = File.join(root, relative)
         return nil unless File.exist?(path)
 
-        data = YAML.safe_load(File.read(path, encoding: "bom|utf-8"), permitted_classes: [])
+        raw = RailsAiContext::SafeFile.read(path)
+        return nil unless raw
+        data = YAML.safe_load(raw, permitted_classes: [])
         return nil unless data.is_a?(Hash)
 
         default_scope = data["default"]
@@ -402,7 +404,8 @@ module RailsAiContext
       # ---- Helpers ----
 
       def parse_json(path)
-        content = File.read(path, encoding: "bom|utf-8")
+        content = RailsAiContext::SafeFile.read(path)
+        return nil unless content
         JSON.parse(content)
       rescue JSON::ParserError
         nil
@@ -450,7 +453,8 @@ module RailsAiContext
       def package_json_has_script?(name)
         path = File.join(root, "package.json")
         return false unless File.exist?(path)
-        content = File.read(path, encoding: "bom|utf-8")
+        content = RailsAiContext::SafeFile.read(path)
+        return false unless content
         content.include?("\"#{name}\"")
       rescue => e
         $stderr.puts "[rails-ai-context] package_json_has_script? failed: #{e.message}" if ENV["DEBUG"]

@@ -26,6 +26,33 @@ RSpec.describe RailsAiContext::Introspector do
       expect(result).to have_key(:conventions)
     end
 
+    it "collects _warnings when an introspector fails" do
+      # Use a minimal config with a known-bad introspector name won't work here,
+      # so instead stub one introspector to raise
+      allow_any_instance_of(RailsAiContext::Introspectors::GemIntrospector)
+        .to receive(:call).and_raise(RuntimeError, "simulated failure")
+
+      result = introspector.call
+
+      expect(result[:gems]).to eq({ error: "simulated failure" })
+      expect(result[:_warnings]).to be_an(Array)
+      expect(result[:_warnings]).to include(
+        hash_including(introspector: "gems", error: "simulated failure")
+      )
+    end
+
+    it "only includes warnings for introspectors that actually failed" do
+      result = introspector.call
+
+      if result[:_warnings]
+        result[:_warnings].each do |w|
+          # Every warning must correspond to an introspector with an :error key
+          expect(result[w[:introspector].to_sym]).to be_a(Hash)
+          expect(result[w[:introspector].to_sym][:error]).to eq(w[:error])
+        end
+      end
+    end
+
     it "extracts schema with tables" do
       result = introspector.call
       schema = result[:schema]
