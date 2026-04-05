@@ -113,7 +113,7 @@ module RailsAiContext
 
         [ views_dir, js_dir ].any? do |dir|
           next false unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**/*")).any? do |f|
+          Dir.glob(File.join(dir, "**/*.{erb,haml,slim,js,ts,jsx,tsx,mjs,rb}")).any? do |f|
             next false if File.directory?(f)
             (RailsAiContext::SafeFile.read(f) || "").match?(/direct.upload|DirectUpload|direct_upload/)
           end

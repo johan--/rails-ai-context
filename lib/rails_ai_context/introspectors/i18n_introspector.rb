@@ -93,15 +93,35 @@ module RailsAiContext
       end
 
       def count_keys_for_locale(locale)
-        path = Dir.glob(File.join(app.root, "config", "locales", "#{locale}.yml")).first
-        return 0 unless path && File.exist?(path)
-        content = RailsAiContext::SafeFile.read(path)
-        return 0 unless content
-        data = YAML.safe_load(content, permitted_classes: [ Symbol ])
-        count_nested_keys(data)
+        paths = find_locale_paths(locale)
+        return 0 if paths.empty?
+        paths.sum do |path|
+          content = RailsAiContext::SafeFile.read(path)
+          next 0 unless content
+          data = YAML.safe_load(content, permitted_classes: [ Symbol ])
+          count_nested_keys(data)
+        rescue
+          0
+        end
       rescue => e
         $stderr.puts "[rails-ai-context] count_keys_for_locale failed: #{e.message}" if ENV["DEBUG"]
         0
+      end
+
+      # Finds all YAML files contributing translations for the given locale:
+      #   config/locales/en.yml
+      #   config/locales/devise.en.yml
+      #   config/locales/en/users.yml
+      #   config/locales/admin/en.yml
+      def find_locale_paths(locale)
+        base = File.join(app.root, "config", "locales")
+        return [] unless Dir.exist?(base)
+        loc = locale.to_s
+        Dir.glob(File.join(base, "**/*.{yml,yaml}")).select do |p|
+          name = File.basename(p, ".*")
+          rel = p.sub("#{base}/", "")
+          name == loc || name.end_with?(".#{loc}") || rel.start_with?("#{loc}/") || rel.include?("/#{loc}/")
+        end
       end
 
       def count_nested_keys(hash, count = 0)

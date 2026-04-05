@@ -78,7 +78,10 @@ module RailsAiContext
 
         content = RailsAiContext::SafeFile.read(routes_path)
         return nil unless content
-        return true if content.match?(/\b(?:health|up|ping|status)\b/)
+        # Match health-check endpoints as quoted route strings only,
+        # to avoid false positives from comments or controller/action names.
+        return true if content.match?(%r{["']/?(?:up|health|ping|status|healthz|alive|liveness|readiness)["']})
+        return true if content.include?("rails_health_check")
         nil
       rescue => e
         $stderr.puts "[rails-ai-context] detect_health_check failed: #{e.message}" if ENV["DEBUG"]

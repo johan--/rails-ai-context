@@ -363,12 +363,11 @@ module RailsAiContext
         methods = []
         in_class_methods = false
         source.each_line do |line|
-          in_class_methods = true if line.match?(/\A\s*(?:class << self|def self\.)/)
-          if line.match?(/\A\s*def self\.(\w+)/)
-            methods << line.match(/def self\.(\w+)/)[1]
-          end
-          if in_class_methods && line.match?(/\A\s*def (\w+)/)
-            methods << line.match(/def (\w+)/)[1]
+          in_class_methods = true if line.match?(/\A\s*class << self\b/)
+          if (m = line.match(/\A\s*def self\.(\w+)/))
+            methods << m[1]
+          elsif in_class_methods && (m = line.match(/\A\s*def (\w+)/))
+            methods << m[1]
           end
           in_class_methods = false if in_class_methods && line.match?(/\A\s*end\s*$/) && !line.match?(/def/)
         end

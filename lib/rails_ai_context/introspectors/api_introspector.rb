@@ -143,10 +143,10 @@ module RailsAiContext
         return nil unless content
 
         strategies = []
-        strategies << "pagy" if content.include?("pagy")
-        strategies << "kaminari" if content.include?("kaminari")
-        strategies << "will_paginate" if content.include?("will_paginate")
-        strategies << "cursor" if content.include?("graphql-pro") # cursor-based pagination
+        strategies << "pagy" if content.match?(/^    pagy \(/)
+        strategies << "kaminari" if content.match?(/^    kaminari \(/)
+        strategies << "will_paginate" if content.match?(/^    will_paginate \(/)
+        strategies << "cursor" if content.match?(/^    graphql-pro \(/) # cursor-based pagination
         strategies.empty? ? nil : strategies
       rescue => e
         $stderr.puts "[rails-ai-context] detect_pagination failed: #{e.message}" if ENV["DEBUG"]

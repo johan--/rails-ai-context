@@ -156,12 +156,13 @@ module RailsAiContext
         return { error: "No Gemfile.lock found" } unless File.exist?(lock_path)
 
         specs = parse_lockfile(lock_path)
+        notable = detect_notable_gems(specs)
 
         {
           total_gems: specs.size,
           ruby_version: specs["ruby"]&.first,
-          notable_gems: detect_notable_gems(specs),
-          categories: categorize_gems(specs),
+          notable_gems: notable,
+          categories: categorize_gems(notable),
           local_gems: detect_local_gems,
           gem_groups: detect_gem_groups
         }
@@ -248,10 +249,9 @@ module RailsAiContext
         end
       end
 
-      def categorize_gems(specs)
-        found = detect_notable_gems(specs)
-        found.group_by { |g| g[:category] }
-             .transform_values { |gems| gems.map { |g| g[:name] } }
+      def categorize_gems(notable)
+        notable.group_by { |g| g[:category] }
+               .transform_values { |gems| gems.map { |g| g[:name] } }
       end
     end
   end

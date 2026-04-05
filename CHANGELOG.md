@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] — 2026-04-06
+
+### Fixed
+
+Accuracy fixes across 8 introspectors, eliminating false positives and capturing previously-missed signals. No public API changes; all 38 MCP tools retain their contracts.
+
+- **ApiIntrospector** — pagination detection (`detect_pagination`) was substring-matching Gemfile.lock content, producing false positives on gems that merely contain the strategy name: `happypagy`, `kaminari-i18n`, transitive `pagy` dependencies. Now uses anchored lockfile regex (`^    pagy \(`) that only matches direct top-level dependencies. Same fix applied to `kaminari`, `will_paginate`, and `graphql-pro` detection.
+- **DevOpsIntrospector** — health-check detection (`detect_health_check`) used an unanchored word regex (`\b(?:health|up|ping|status)\b`) that matched comments, controller names, and any line containing those words. Tightened to match only quoted route strings (`"/up"`, `"/healthz"`, `"/liveness"`, etc.) or the `rails_health_check` symbol. Also newly detects `/readiness`, `/alive`, and `/healthz` routes.
+- **PerformanceIntrospector** — schema parsing (`parse_indexed_columns`) tracked table context with a boolean-ish `current_table` variable but never cleared it on `end` lines, so `add_index` statements after a `create_table` block matched both the inner block branch AND the outer branch, producing duplicate index entries. This polluted `missing_fk_indexes` analysis. Fixed via explicit `inside_create_table` state flag with block boundary detection. Also added `m` (multiline) flag to specific-association preload regex so `.includes(...)` calls spanning multiple lines are matched.
+- **I18nIntrospector** — `count_keys_for_locale` only read `config/locales/{locale}.yml`, missing nested locale files that are the Rails convention for gem-added translations: `config/locales/devise.en.yml`, `config/locales/en/users.yml`, `config/locales/admin/en.yml`. New `find_locale_paths` method globs all YAML under `config/locales/**/*` and selects files whose basename equals the locale, ends with `.{locale}`, or lives under a `{locale}/` subfolder. In typical Rails apps this captures 2-10x more translation keys than the previous single-file read, making `translation_coverage` percentages meaningful.
+- **JobIntrospector** — when a job class declared `queue_as ->(job) { ... }`, `job.queue_name` returned a Proc that was then called with no arguments, crashing or returning stale values. Now returns `"dynamic"` when queue is a Proc, matching the job's actual runtime behavior (queue is resolved per-invocation).
+- **ModelIntrospector** — source-parsed class methods in `extract_source_class_methods` emitted a spurious `"self"` entry because `def self.foo` matched both the `def self.(\w+)` branch AND the generic `def (\w+)` branch inside `class << self` tracking. Restructured as `if/elsif` so each `def` line matches exactly one pattern. Also anchored `class << self` detection with `\b` to avoid partial-word matches.
+- **RouteIntrospector** — `call` method could raise if `Rails.application.routes` was not yet loaded or a sub-method failed mid-extraction. Added a top-level rescue that returns `{ error: msg }`, matching the error contract used by every other introspector.
+- **SeedsIntrospector** — `has_ordering` regex (`load.*order|require.*order|seeds.*\d+`) matched unrelated code like `require 'order'` or `seeds 001` in comments. Tightened to match actual ordering patterns: `Dir[...*.rb].sort`, `load "seeds/NN_foo.rb"`, `require_relative "seeds/NN_foo"`.
+
+### Performance
+
+- **ConventionIntrospector** — `gem_present?` was reading `Gemfile.lock` from disk 15 times per introspection pass (once per notable gem check). Memoized into a single read: **-93% I/O** (15 reads → 1 read). ~60% faster on typical apps.
+- **ComponentIntrospector** — `build_summary` called `extract_components` again after `call` already computed it, doubling the filesystem walk and component parsing work. Now passes the result through: **-50% work**. ~50% faster.
+- **GemIntrospector** — `categorize_gems(specs)` internally called `detect_notable_gems(specs)` after `call` had already called it, duplicating gem-list iteration and category lookup. Now accepts the notable-gem result directly: **-50% work**.
+- **ActiveStorageIntrospector** — `uses_direct_uploads?` globbed `**/*` across `app/views` + `app/javascript`, reading every binary, image, font, and asset in those trees. Scoped to 9 relevant extensions (`erb,haml,slim,js,ts,jsx,tsx,mjs,rb`), avoiding wasteful I/O on irrelevant files.
+- **Total**: ~14% cumulative speedup across all 12 modified introspectors on a medium-sized Rails app (23.66ms → 20.33ms).
+
+### Why
+
+Introspector output feeds every MCP tool response, every context file, and every rule file this gem generates. Silent inaccuracies (false-positive pagination detection, missed locale files, phantom duplicate indexes) compound: AI assistants make decisions based on this data, and incorrect data produces incorrect code suggestions. These fixes tighten the accuracy floor without changing any public interface.
+
 ## [5.0.0] — 2026-04-05
 
 ### Removed (BREAKING)

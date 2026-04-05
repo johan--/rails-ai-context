@@ -23,6 +23,8 @@ module RailsAiContext
           mounted_engines: detect_mounted_engines,
           root_route: root ? "#{root[:controller]}##{root[:action]}" : nil
         }
+      rescue => e
+        { error: e.message }
       end
 
       private

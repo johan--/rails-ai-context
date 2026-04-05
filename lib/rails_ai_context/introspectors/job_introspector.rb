@@ -36,7 +36,7 @@ module RailsAiContext
                   job.name.start_with?("ActionMailer", "ActiveStorage::", "ActionMailbox::", "Turbo::", "Sentry::")
 
           queue = job.queue_name
-          queue = begin queue.call rescue "default" end if queue.is_a?(Proc)
+          queue = "dynamic" if queue.is_a?(Proc)
 
           {
             name: job.name,

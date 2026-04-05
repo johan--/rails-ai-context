@@ -46,7 +46,7 @@ module RailsAiContext
           uses_csv: content.match?(/CSV\.|require.*csv/i),
           loads_directory: content.match?(/Dir\[|Dir\.glob|load.*seeds/),
           environment_conditional: content.match?(/Rails\.env/),
-          has_ordering: content.match?(/load.*order|require.*order|seeds.*\d+/i)
+          has_ordering: content.match?(/Dir\[.*\*\.rb\]\.sort|load\s+["'].*_\d+\.rb|require_relative\s+["'].*_\d+/)
         }
       rescue => e
         { exists: false, error: e.message }

@@ -43,26 +43,26 @@ module RailsAiContext
         tables = {}
 
         current_table = nil
+        inside_create_table = false
         content.each_line do |line|
           if (match = line.match(/create_table\s+"(\w+)"/))
             current_table = match[1]
+            inside_create_table = true
             tables[current_table] = { columns: [], indexes: [] }
-          elsif current_table
+          elsif inside_create_table && line.match?(/\A\s*end\b/)
+            inside_create_table = false
+            current_table = nil
+          elsif inside_create_table
             if (col = line.match(/t\.(\w+)\s+"(\w+)"/))
               tables[current_table][:columns] << { type: col[1], name: col[2] }
             elsif (ref = line.match(/t\.references\s+"(\w+)"/))
               tables[current_table][:columns] << { type: "references", name: "#{ref[1]}_id" }
-            elsif (idx = line.match(/add_index\s+"#{Regexp.escape(current_table)}",\s+(?:"(\w+)"|\[([^\]]+)\])/))
-              col_name = idx[1] || idx[2]&.gsub(/["'\s]/, "")
-              tables[current_table][:indexes] << col_name
             elsif (tidx = line.match(/t\.index\s+\[([^\]]+)\]/))
               # t.index ["col_name"] inside create_table block
               cols = tidx[1].gsub(/["'\s]/, "").split(",")
               cols.each { |c| tables[current_table][:indexes] << c }
             end
-          end
-
-          if (idx = line.match(/add_index\s+"(\w+)",\s+(?:"(\w+)"|\[([^\]]+)\])/))
+          elsif (idx = line.match(/add_index\s+"(\w+)",\s+(?:"(\w+)"|\[([^\]]+)\])/))
             table = idx[1]
             col_name = idx[2] || idx[3]&.gsub(/["'\s]/, "")
             tables[table][:indexes] << col_name if tables[table]
@@ -246,7 +246,7 @@ module RailsAiContext
         combined = "#{query_chain}\n#{action_body}"
         preload_re = /\.(#{PRELOAD_METHODS.join("|")})\(/
         # Match both :assoc_name (symbol) and assoc_name: (hash key for nested includes)
-        specific_re = /\.(#{PRELOAD_METHODS.join("|")})\(.*(:#{Regexp.escape(assoc_name)}\b|#{Regexp.escape(assoc_name)}:)/
+        specific_re = /\.(#{PRELOAD_METHODS.join("|")})\(.*(:#{Regexp.escape(assoc_name)}\b|#{Regexp.escape(assoc_name)}:)/m
 
         if combined.match?(specific_re)
           :low

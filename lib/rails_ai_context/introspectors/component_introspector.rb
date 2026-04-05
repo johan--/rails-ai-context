@@ -12,9 +12,10 @@ module RailsAiContext
       end
 
       def call
+        components = extract_components
         {
-          components: extract_components,
-          summary: build_summary
+          components: components,
+          summary: build_summary(components)
         }
       rescue => e
         { error: e.message }
@@ -299,8 +300,8 @@ module RailsAiContext
         assets.sort
       end
 
-      def build_summary
-        components = extract_components
+      def build_summary(components = nil)
+        components ||= extract_components
         return {} if components.empty?
 
         types = components.group_by { |c| c[:type] }
