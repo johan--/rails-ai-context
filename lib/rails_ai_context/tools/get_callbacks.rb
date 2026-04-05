@@ -57,7 +57,7 @@ module RailsAiContext
 
         # Specific model — show callbacks in execution order
         if model
-          key = models.keys.find { |k| k.downcase == model.downcase } || model
+          key = fuzzy_find_key(models.keys, model) || model
           data = models[key]
           unless data
             return not_found_response("Model", model, models.keys.sort,
@@ -122,7 +122,7 @@ module RailsAiContext
             concern_callbacks.each do |concern_name, info|
               lines << "### #{concern_name}"
               info[:callbacks].each do |cb|
-                source = extract_method_source(info[:path], cb[:method_name])
+                source = extract_method_source_from_file(info[:path], cb[:method_name])
                 lines << "- #{cb[:declaration]}"
                 if source
                   lines << "```ruby"
@@ -227,39 +227,7 @@ module RailsAiContext
 
       private_class_method def self.extract_callback_source(model_name, method_name)
         path = Rails.root.join("app", "models", "#{model_name.underscore}.rb")
-        extract_method_source(path, method_name)
-      end
-
-      private_class_method def self.extract_method_source(path, method_name)
-        return nil unless File.exist?(path)
-        return nil if File.size(path) > RailsAiContext.configuration.max_file_size
-
-        source_lines = (RailsAiContext::SafeFile.read(path) || "").lines
-        method_str = method_name.to_s
-
-        # Find method definition (could be public or private)
-        start_idx = source_lines.index { |l| l.match?(/\A\s*def\s+#{Regexp.escape(method_str)}\b/) }
-        return nil unless start_idx
-
-        # Use indentation-based matching
-        def_indent = source_lines[start_idx][/\A\s*/].length
-        result = []
-        end_idx = start_idx
-
-        source_lines[start_idx..].each_with_index do |line, i|
-          result << line.rstrip
-          end_idx = start_idx + i
-          break if i > 0 && line.match?(/\A\s{#{def_indent}}end\b/)
-        end
-
-        {
-          code: result.join("\n"),
-          start_line: start_idx + 1,
-          end_line: end_idx + 1
-        }
-      rescue => e
-        $stderr.puts "[rails-ai-context] extract_method_source failed: #{e.message}" if ENV["DEBUG"]
-        nil
+        extract_method_source_from_file(path, method_name)
       end
 
       private_class_method def self.find_concern_callbacks(model_name, data)

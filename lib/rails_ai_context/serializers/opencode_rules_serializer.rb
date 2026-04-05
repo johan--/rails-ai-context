@@ -56,15 +56,8 @@ module RailsAiContext
           line += " — #{assocs}" unless assocs.empty?
           line += " [#{vals}v]" if vals > 0
           lines << line
-          scopes = (data[:scopes] || [])
-          constants = (data[:constants] || [])
-          if scopes.any? || constants.any?
-            extras = []
-            scope_names = scope_names(scopes)
-            extras << "scopes: #{scope_names.join(', ')}" if scopes.any?
-            constants.each { |c| extras << "#{c[:name]}: #{c[:values].join(', ')}" }
-            lines << "  #{extras.join(' | ')}"
-          end
+          extras = model_extras_line(data)
+          lines << extras if extras
         end
 
         lines << "- _...#{models.size - 30} more_" if models.size > 30

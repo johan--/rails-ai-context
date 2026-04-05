@@ -148,8 +148,7 @@ module RailsAiContext
         end
 
         def find_model_key(query, keys)
-          keys.find { |k| k.downcase == query.downcase } ||
-            keys.find { |k| k.underscore.downcase == query.downcase }
+          fuzzy_find_key(keys, query)
         end
 
         def extract_subgraph(graph, center, depth)

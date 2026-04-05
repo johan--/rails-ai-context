@@ -77,15 +77,8 @@ module RailsAiContext
           line += " (#{assoc_count}a, #{val_count}v)" if assoc_count > 0 || val_count > 0
           line += " — #{top_assocs}" if top_assocs && !top_assocs.empty?
           lines << line
-          scopes = (data[:scopes] || [])
-          constants = (data[:constants] || [])
-          if scopes.any? || constants.any?
-            extras = []
-            scope_names = scope_names(scopes)
-            extras << "scopes: #{scope_names.join(', ')}" if scopes.any?
-            constants.each { |c| extras << "#{c[:name]}: #{c[:values].join(', ')}" }
-            lines << "  #{extras.join(' | ')}"
-          end
+          extras = model_extras_line(data)
+          lines << extras if extras
         end
         lines << "- _...#{models.size - max_show} more (use `rails_get_model_details` tool)_" if models.size > max_show
         lines << ""
@@ -104,19 +97,6 @@ module RailsAiContext
           names = gem_list.map { |g| g[:name] }.join(", ")
           lines << "- **#{category}**: #{names}"
         end
-        lines << ""
-        lines
-      end
-
-      def render_conventions
-        conv = context[:conventions]
-        return [] unless conv.is_a?(Hash) && !conv[:error]
-
-        config_files = conv[:config_files] || []
-        return [] if config_files.empty?
-
-        lines = [ "## Key config files" ]
-        config_files.first(5).each { |f| lines << "- `#{f}`" }
         lines << ""
         lines
       end

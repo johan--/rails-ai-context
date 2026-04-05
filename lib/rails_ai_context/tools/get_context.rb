@@ -214,9 +214,7 @@ module RailsAiContext
         # Normalize: try as-is, then singularized, then classified
         ctx = cached_context
         models = ctx[:models] || {}
-        key = models.keys.find { |k| k.downcase == model_name.downcase } ||
-              models.keys.find { |k| k.downcase == model_name.singularize.downcase } ||
-              models.keys.find { |k| k.downcase == model_name.classify.downcase }
+        key = fuzzy_find_key(models.keys, model_name)
 
         resolved_name = key || model_name
 

@@ -113,6 +113,43 @@ module RailsAiContext
         scopes.map { |s| s.is_a?(Hash) ? s[:name] : s }
       end
 
+      # Render a compact controllers listing: "- Name (N actions)" + "...X more".
+      # Shared by cursor_rules and copilot_instructions serializers.
+      def render_compact_controllers_list(controllers_hash, limit: 25)
+        lines = []
+        controllers_hash.keys.sort.first(limit).each do |name|
+          info = controllers_hash[name]
+          action_count = info[:actions]&.size || 0
+          lines << "- #{name} (#{action_count} actions)"
+        end
+        lines << "- ...#{controllers_hash.size - limit} more" if controllers_hash.size > limit
+        lines
+      end
+
+      # Render a Stimulus controllers section from context[:stimulus].
+      # Returns lines or [] if no Stimulus controllers.
+      def render_stimulus_section(ctx = context)
+        stim = ctx[:stimulus]
+        return [] unless stim.is_a?(Hash) && !stim[:error]
+        controllers = stim[:controllers] || []
+        return [] if controllers.empty?
+        names = controllers.map { |c| c[:name] || c[:file]&.gsub("_controller.js", "") }.compact.sort
+        [ "", "## Stimulus controllers", names.join(", ") ]
+      end
+
+      # Render scopes and constants as a one-line extras summary for a model entry.
+      # Returns "  scopes: a, b | STATUS: draft, active" or nil if no extras exist.
+      # Shared by cursor_rules, opencode_rules, copilot_instructions, compact_serializer_helper.
+      def model_extras_line(data)
+        scopes = data[:scopes] || []
+        constants = data[:constants] || []
+        return nil unless scopes.any? || constants.any?
+        extras = []
+        extras << "scopes: #{scope_names(scopes).join(', ')}" if scopes.any?
+        constants.each { |c| extras << "#{c[:name]}: #{c[:values].join(', ')}" }
+        "  #{extras.join(' | ')}"
+      end
+
       # Extract notable gems with triple-fallback for varying introspector output shapes.
       def notable_gems_list(gems_data)
         return [] unless gems_data.is_a?(Hash) && !gems_data[:error]

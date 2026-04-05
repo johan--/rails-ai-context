@@ -120,15 +120,8 @@ module RailsAiContext
           data = models[name]
           assocs = (data[:associations] || []).size
           lines << "- #{name} (#{assocs} associations, table: #{data[:table_name] || '?'})"
-          scopes = (data[:scopes] || [])
-          constants = (data[:constants] || [])
-          if scopes.any? || constants.any?
-            extras = []
-            scope_names = scope_names(scopes)
-            extras << "scopes: #{scope_names.join(', ')}" if scopes.any?
-            constants.each { |c| extras << "#{c[:name]}: #{c[:values].join(', ')}" }
-            lines << "  #{extras.join(' | ')}"
-          end
+          extras = model_extras_line(data)
+          lines << extras if extras
         end
 
         lines << "- ...#{models.size - 30} more" if models.size > 30
@@ -156,13 +149,8 @@ module RailsAiContext
           ""
         ]
 
-        controllers.keys.sort.first(25).each do |name|
-          info = controllers[name]
-          action_count = info[:actions]&.size || 0
-          lines << "- #{name} (#{action_count} actions)"
-        end
+        lines.concat(render_compact_controllers_list(controllers))
 
-        lines << "- ...#{controllers.size - 25} more" if controllers.size > 25
         lines << ""
         lines << "Use `rails_get_controllers` MCP tool with controller:\"Name\" for full detail."
 
@@ -198,16 +186,7 @@ module RailsAiContext
           end
         rescue => e; $stderr.puts "[rails-ai-context] Serializer section skipped: #{e.message}"; end
 
-        # Stimulus controllers
-        stim = context[:stimulus]
-        if stim.is_a?(Hash) && !stim[:error]
-          controllers = stim[:controllers] || []
-          if controllers.any?
-            names = controllers.map { |c| c[:name] || c[:file]&.gsub("_controller.js", "") }.compact.sort
-            lines << "" << "## Stimulus controllers"
-            lines << names.join(", ")
-          end
-        end
+        lines.concat(render_stimulus_section(context))
 
         lines.join("\n")
       end

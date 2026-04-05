@@ -130,11 +130,11 @@ module RailsAiContext
           if detail == "full"
             public_methods.each do |m|
               method_name = m.to_s.split("(").first
-              method_source = extract_method_source(source, method_name)
+              method_source = extract_method_source_from_string(source, method_name)
               if method_source
                 lines << "### #{m}"
                 lines << "```ruby"
-                lines << method_source
+                lines << method_source[:code]
                 lines << "```"
                 lines << ""
               else
@@ -154,11 +154,11 @@ module RailsAiContext
             class_methods.each do |m|
               method_name = m.to_s.split("(").first
               # Try both `def method_name` and `def self.method_name`
-              method_source = extract_method_source(source, method_name) || extract_method_source(source, "self.#{method_name}")
+              method_source = extract_method_source_from_string(source, method_name) || extract_method_source_from_string(source, "self.#{method_name}")
               if method_source
                 lines << "### #{m}"
                 lines << "```ruby"
-                lines << method_source
+                lines << method_source[:code]
                 lines << "```"
                 lines << ""
               else
@@ -386,33 +386,6 @@ module RailsAiContext
       rescue => e
         $stderr.puts "[rails-ai-context] parse_concern_callbacks failed: #{e.message}" if ENV["DEBUG"]
         []
-      end
-
-      # Extract method source from raw source string using indentation-based matching
-      private_class_method def self.extract_method_source(source, method_name)
-        source_lines = source.lines
-        escaped = Regexp.escape(method_name.to_s)
-        # Don't use \b after ? or ! — they ARE word boundaries
-        pattern = if method_name.to_s.end_with?("?") || method_name.to_s.end_with?("!")
-          /\A\s*def\s+#{escaped}/
-        else
-          /\A\s*def\s+#{escaped}\b/
-        end
-        start_idx = source_lines.index { |l| l.match?(pattern) }
-        return nil unless start_idx
-
-        def_indent = source_lines[start_idx][/\A\s*/].length
-        result = []
-
-        source_lines[start_idx..].each_with_index do |line, i|
-          result << line.rstrip
-          break if i > 0 && line.match?(/\A\s{#{def_indent}}end\b/)
-        end
-
-        result.join("\n")
-      rescue => e
-        $stderr.puts "[rails-ai-context] extract_method_source failed: #{e.message}" if ENV["DEBUG"]
-        nil
       end
 
       private_class_method def self.find_includers(concern_name, root, concern_type)

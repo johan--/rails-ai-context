@@ -153,6 +153,60 @@ module RailsAiContext
           SHARED_CACHE[:fingerprint] || "none"
         end
 
+        # Case-insensitive fuzzy key lookup for hashes keyed by class/table names.
+        # Tries exact, underscore, singularize, and classify variants. Returns matching key or nil.
+        # Shared by get_model_details, get_callbacks, get_context, generate_test, dependency_graph.
+        def fuzzy_find_key(keys, query)
+          return nil if query.nil? || keys.nil? || keys.empty?
+          q = query.to_s.strip
+          return nil if q.empty?
+          q_down = q.downcase
+          q_under = q.underscore.downcase
+
+          keys.find { |k| k.to_s.downcase == q_down } ||
+            keys.find { |k| k.to_s.underscore.downcase == q_under } ||
+            keys.find { |k| k.to_s.downcase == q.singularize.downcase } ||
+            keys.find { |k| k.to_s.downcase == q.classify.downcase }
+        end
+
+        # Extract method source from a source string via indentation-based matching.
+        # Returns { code:, start_line:, end_line: } or nil. Shared by get_callbacks, get_concern.
+        def extract_method_source_from_string(source, method_name)
+          source_lines = source.lines
+          escaped = Regexp.escape(method_name.to_s)
+          # ? and ! ARE word boundaries, so skip \b after them
+          pattern = if method_name.to_s.end_with?("?", "!")
+            /\A\s*def\s+#{escaped}/
+          else
+            /\A\s*def\s+#{escaped}\b/
+          end
+          start_idx = source_lines.index { |l| l.match?(pattern) }
+          return nil unless start_idx
+
+          def_indent = source_lines[start_idx][/\A\s*/].length
+          result = []
+          end_idx = start_idx
+
+          source_lines[start_idx..].each_with_index do |line, i|
+            result << line.rstrip
+            end_idx = start_idx + i
+            break if i > 0 && line.match?(/\A\s{#{def_indent}}end\b/)
+          end
+
+          { code: result.join("\n"), start_line: start_idx + 1, end_line: end_idx + 1 }
+        rescue => e
+          $stderr.puts "[rails-ai-context] extract_method_source_from_string failed: #{e.message}" if ENV["DEBUG"]
+          nil
+        end
+
+        # Extract method source from a file path. Reads file safely. Returns hash or nil.
+        def extract_method_source_from_file(path, method_name)
+          return nil unless File.exist?(path)
+          return nil if File.size(path) > RailsAiContext.configuration.max_file_size
+          source = RailsAiContext::SafeFile.read(path) || ""
+          extract_method_source_from_string(source, method_name)
+        end
+
         # Store call params for the current tool invocation (thread-safe)
         def set_call_params(**params)
           Thread.current[:rails_ai_context_call_params] = params.reject { |_, v| v.nil? || (v.respond_to?(:empty?) && v.empty?) }

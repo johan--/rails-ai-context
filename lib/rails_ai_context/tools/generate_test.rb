@@ -99,8 +99,7 @@ module RailsAiContext
 
         def generate_model_test(model_name, framework, patterns, tests_data)
           models = cached_context[:models] || {}
-          key = models.keys.find { |k| k.downcase == model_name.downcase } ||
-                models.keys.find { |k| k.underscore == model_name.underscore }
+          key = fuzzy_find_key(models.keys, model_name)
           unless key
             return not_found_response("Model", model_name, models.keys.sort,
               recovery_tool: "Call rails_get_model_details(detail:\"summary\") to see all models")
