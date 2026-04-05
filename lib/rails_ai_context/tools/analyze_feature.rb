@@ -50,7 +50,6 @@ module RailsAiContext
         discover_mailers(root, pattern, lines)
         discover_env_dependencies(root, pattern, matched_models, lines)
         discover_test_gaps(root, pattern, matched_models, ctx, test_files || [], lines)
-        discover_accessibility(ctx, pattern, lines)
         discover_components(ctx, pattern, lines)
 
         # For auth-related keywords, also discover auth gems
@@ -511,25 +510,6 @@ module RailsAiContext
           lines << ""
         rescue => e
           $stderr.puts "[rails-ai-context] discover_mailers failed: #{e.message}" if ENV["DEBUG"]
-          nil
-        end
-
-        # --- Accessibility summary for feature views ---
-        def discover_accessibility(ctx, pattern, lines)
-          a11y = ctx[:accessibility]
-          return unless a11y.is_a?(Hash) && !a11y[:error]
-
-          # Filter accessibility findings related to the feature's views
-          findings = a11y[:view_findings]&.select { |f| f[:file]&.downcase&.include?(pattern) }
-          return if findings.nil? || findings.empty?
-
-          lines << "## Accessibility"
-          findings.first(10).each do |f|
-            lines << "- `#{f[:file]}`: #{f[:issue]}"
-          end
-          lines << ""
-        rescue => e
-          $stderr.puts "[rails-ai-context] discover_accessibility failed: #{e.message}" if ENV["DEBUG"]
           nil
         end
 

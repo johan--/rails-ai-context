@@ -66,7 +66,7 @@ rails-ai-context serve    # start MCP server
 
 </div>
 
-Now your AI doesn't guess — it **asks your app directly.** 39 tools that query your schema, models, routes, controllers, views, and conventions on demand. It gets the right answer the first time.
+Now your AI doesn't guess — it **asks your app directly.** 38 tools that query your schema, models, routes, controllers, views, and conventions on demand. It gets the right answer the first time.
 
 <br>
 
@@ -147,7 +147,7 @@ rails ai:serve
 
 ### CLI
 
-Same 39 tools, no server needed. Works in any terminal, any AI tool.
+Same 38 tools, no server needed. Works in any terminal, any AI tool.
 
 ```bash
 rails 'ai:tool[search_code]' pattern="can_cook?" match_type=trace
@@ -215,13 +215,13 @@ rails 'ai:tool[validate]' files=app/controllers/cooks_controller.rb level=rails
 <br>
 
 ```bash
-# Get the design system
-rails 'ai:tool[design_system]' detail=standard
-# → your actual button classes, card patterns, color palette — copy-paste ready
-
 # Check existing view patterns
 rails 'ai:tool[view]' controller=dashboard
 # → templates with ivars, Turbo frames, Stimulus controllers, partial locals
+
+# See existing components + usage examples
+rails 'ai:tool[component_catalog]' detail=standard
+# → ViewComponent/Phlex props, slots, previews, sidecar assets
 
 # Get Stimulus data-attributes
 rails 'ai:tool[stimulus]' controller=chart
@@ -232,7 +232,7 @@ rails 'ai:tool[stimulus]' controller=chart
 
 <br>
 
-## 39 Tools
+## 38 Tools
 
 Every tool is **read-only** and returns data verified against your actual app — not guesses, not training data.
 
@@ -286,7 +286,6 @@ Every tool is **read-only** and returns data verified against your actual app �
 |:-----|:------------|
 | `get_view` | Templates with ivars, Turbo wiring, Stimulus refs, partial locals |
 | `get_stimulus` | HTML data-attributes (dashes!) + targets + values + actions |
-| `get_design_system` | Copy-paste HTML/ERB patterns for your actual components |
 | `get_partial_interface` | What locals to pass + what methods are called on them |
 | `get_turbo_map` | Broadcast → subscription wiring + mismatch warnings |
 | `get_frontend_stack` | React/Vue/Svelte/Angular, Hotwire, TypeScript, package manager |
@@ -372,7 +371,7 @@ Enabled by default. Disable with `config.anti_hallucination_rules = false` if yo
 │  Your Rails App                                          │
 │  models + schema + routes + controllers + views + jobs   │
 └────────────────────────┬────────────────────────────────┘
-                         │ introspects (33 introspectors)
+                         │ introspects (31 introspectors)
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │  rails-ai-context                                        │
@@ -382,7 +381,7 @@ Enabled by default. Disable with `config.anti_hallucination_rules = false` if yo
          ▼                  ▼              ▼
 ┌──────────────────┐ ┌────────────┐ ┌────────────────────┐
 │  Static Files     │ │  MCP Server │ │  CLI Tools          │
-│  CLAUDE.md        │ │  39 tools   │ │  Same 39 tools      │
+│  CLAUDE.md        │ │  38 tools   │ │  Same 38 tools      │
 │  .cursor/rules/   │ │  stdio/HTTP │ │  No server needed   │
 │  .github/instr... │ │  .mcp.json  │ │  rails 'ai:tool[X]' │
 └──────────────────┘ └────────────┘ └────────────────────┘
@@ -416,7 +415,7 @@ Both paths ask which AI tools you use and whether you want MCP or CLI mode. `.mc
 | In-Gemfile | Standalone | What it does |
 |:-----------|:-----------|:------------|
 | `rails ai:context` | `rails-ai-context context` | Generate context files |
-| `rails 'ai:tool[NAME]'` | `rails-ai-context tool NAME` | Run any of the 39 tools |
+| `rails 'ai:tool[NAME]'` | `rails-ai-context tool NAME` | Run any of the 38 tools |
 | `rails ai:tool` | `rails-ai-context tool --list` | List all available tools |
 | `rails ai:serve` | `rails-ai-context serve` | Start MCP server (stdio) |
 | `rails ai:doctor` | `rails-ai-context doctor` | Diagnostics + AI readiness score |
@@ -431,7 +430,7 @@ Both paths ask which AI tools you use and whether you want MCP or CLI mode. `.mc
 RailsAiContext.configure do |config|
   config.ai_tools   = %i[claude cursor]   # Which AI tools to generate for
   config.tool_mode   = :mcp               # :mcp (default) or :cli
-  config.preset      = :full              # :full (33 introspectors) or :standard (19)
+  config.preset      = :full              # :full (31 introspectors) or :standard (17)
 end
 ```
 
@@ -442,7 +441,7 @@ end
 
 | Option | Default | Description |
 |:-------|:--------|:------------|
-| `preset` | `:full` | `:full` (33 introspectors) or `:standard` (19) |
+| `preset` | `:full` | `:full` (31 introspectors) or `:standard` (17) |
 | `context_mode` | `:compact` | `:compact` (150 lines) or `:full` |
 | `generate_root_files` | `true` | Set `false` for split rules only |
 | `anti_hallucination_rules` | `true` | Embed 6-rule verification protocol in generated context files |
@@ -471,7 +470,7 @@ end
 ## About
 
 Built by a Rails developer with 10+ years of production experience.<br>
-1621 tests. 39 tools. 33 introspectors. Standalone or in-Gemfile.<br>
+1563 tests. 38 tools. 31 introspectors. Standalone or in-Gemfile.<br>
 MIT licensed. [Contributions welcome.](CONTRIBUTING.md)
 
 <br>

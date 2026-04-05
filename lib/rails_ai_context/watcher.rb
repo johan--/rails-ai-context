@@ -33,6 +33,13 @@ module RailsAiContext
         return
       end
 
+      # One-time v5.0.0 legacy UI-pattern files warning (warn_only: no prompt in watch mode)
+      LegacyCleanup.prompt_legacy_files(
+        RailsAiContext.configuration.ai_tools,
+        root: root,
+        warn_only: true
+      )
+
       $stderr.puts "[rails-ai-context] Watching for changes..."
       $stderr.puts "[rails-ai-context] Directories: #{dirs.map { |d| d.sub("#{root}/", '') }.join(', ')}"
 

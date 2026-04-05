@@ -359,6 +359,9 @@ namespace :ai do
     # Cleanup removed tools (only when re-running with different selections)
     cleanup_removed_ai_tools(previous_tools, ai_tools) if previous_tools&.any? && ai_tools
 
+    # One-time v5.0.0 legacy cleanup prompt for removed UI pattern files
+    RailsAiContext::LegacyCleanup.prompt_legacy_files(ai_tools, root: Rails.root)
+
     # Write .rails-ai-context.yml alongside initializer (enables standalone mode)
     save_yaml_config(ai_tools || RailsAiContext.configuration.ai_tools,
                      RailsAiContext.configuration.tool_mode)
@@ -400,6 +403,7 @@ namespace :ai do
     apply_context_mode_override
 
     format = (args[:format] || ENV["FORMAT"] || "claude").to_sym
+    RailsAiContext::LegacyCleanup.prompt_legacy_files([ format ], root: Rails.root)
     puts "🔍 Introspecting #{Rails.application.class.module_parent_name}..."
 
     puts "📝 Writing #{format} context file..."
@@ -417,6 +421,7 @@ namespace :ai do
 
         apply_context_mode_override
 
+        RailsAiContext::LegacyCleanup.prompt_legacy_files([ fmt ], root: Rails.root)
         puts "🔍 Introspecting #{Rails.application.class.module_parent_name}..."
         puts "📝 Writing #{file}..."
         result = RailsAiContext.generate_context(format: fmt)
@@ -436,6 +441,9 @@ namespace :ai do
       require "rails_ai_context"
 
       RailsAiContext.configuration.context_mode = :full
+      RailsAiContext::LegacyCleanup.prompt_legacy_files(
+        RailsAiContext.configuration.ai_tools, root: Rails.root
+      )
       puts "🔍 Introspecting #{Rails.application.class.module_parent_name} (full mode)..."
       puts "📝 Writing context files..."
       result = RailsAiContext.generate_context(format: :all)

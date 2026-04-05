@@ -3,95 +3,20 @@
 require "spec_helper"
 
 RSpec.describe "Token-saving improvements" do
-  describe "Improvement 1: UI pattern extraction" do
+  describe "Improvement 1: View template introspection" do
     let(:introspector) { RailsAiContext::Introspectors::ViewTemplateIntrospector.new(Rails.application) }
 
-    it "returns ui_patterns key" do
+    it "returns templates and partials keys" do
       result = introspector.call
-      expect(result).to have_key(:ui_patterns)
-      expect(result[:ui_patterns]).to be_a(Hash)
+      expect(result).to have_key(:templates)
+      expect(result).to have_key(:partials)
+      expect(result[:templates]).to be_a(Hash)
+      expect(result[:partials]).to be_a(Hash)
     end
 
-    it "extracts patterns from views with repeated classes" do
-      Dir.mktmpdir do |dir|
-        views_dir = File.join(dir, "app", "views", "posts")
-        FileUtils.mkdir_p(views_dir)
-        # Create two views with repeated class patterns
-        content = '<div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">card</div>'
-        File.write(File.join(views_dir, "index.html.erb"), content * 3)
-        File.write(File.join(views_dir, "show.html.erb"), content * 2)
-
-        app = double("app", root: Pathname.new(dir))
-        result = RailsAiContext::Introspectors::ViewTemplateIntrospector.new(app).call
-        expect(result[:ui_patterns]).to be_a(Hash)
-      end
-    end
-
-    it "includes Design System in ClaudeSerializer compact output" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :button, label: "Button (primary)", classes: "bg-orange-600 text-white px-4 py-2 rounded-xl hover:bg-orange-700" } ], color_scheme: { primary: "orange" } }
-      }
-      output = RailsAiContext::Serializers::ClaudeSerializer.new(context).call
-      expect(output).to include("Design System")
-      expect(output).to include("bg-orange-600")
-    end
-
-    it "includes Design System in OpencodeSerializer compact output" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :card, label: "Card", classes: "bg-white rounded-2xl p-6 shadow-sm" } ] }
-      }
-      output = RailsAiContext::Serializers::OpencodeSerializer.new(context).call
-      expect(output).to include("Design System")
-    end
-
-    it "includes Design System in CopilotSerializer compact output" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :input, label: "Input", classes: "border rounded-lg px-3 py-2 focus:ring-2" } ] }
-      }
-      output = RailsAiContext::Serializers::CopilotSerializer.new(context).call
-      expect(output).to include("Design System")
-    end
-
-    it "generates rails-ui-patterns.md in Claude rules" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :button, label: "Button (primary)", classes: "bg-orange-600 text-white rounded-xl" } ] }
-      }
-      Dir.mktmpdir do |dir|
-        result = RailsAiContext::Serializers::ClaudeRulesSerializer.new(context).call(dir)
-        ui_file = File.join(dir, ".claude", "rules", "rails-ui-patterns.md")
-        expect(File.exist?(ui_file)).to be true
-        expect(File.read(ui_file)).to include("bg-orange-600")
-      end
-    end
-
-    it "generates rails-ui-patterns.mdc in Cursor rules" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :card, label: "Card", classes: "bg-white rounded-xl shadow-sm" } ] }
-      }
-      Dir.mktmpdir do |dir|
-        result = RailsAiContext::Serializers::CursorRulesSerializer.new(context).call(dir)
-        ui_file = File.join(dir, ".cursor", "rules", "rails-ui-patterns.mdc")
-        expect(File.exist?(ui_file)).to be true
-        expect(File.read(ui_file)).to include("bg-white")
-      end
-    end
-
-    it "generates rails-ui-patterns.instructions.md in Copilot rules" do
-      context = RailsAiContext.introspect
-      context[:view_templates] = {
-        ui_patterns: { components: [ { type: :label, label: "Label", classes: "block text-sm font-semibold" } ] }
-      }
-      Dir.mktmpdir do |dir|
-        result = RailsAiContext::Serializers::CopilotInstructionsSerializer.new(context).call(dir)
-        ui_file = File.join(dir, ".github", "instructions", "rails-ui-patterns.instructions.md")
-        expect(File.exist?(ui_file)).to be true
-        expect(File.read(ui_file)).to include("font-semibold")
-      end
+    it "does not include ui_patterns (removed in v5.0.0)" do
+      result = introspector.call
+      expect(result).not_to have_key(:ui_patterns)
     end
   end
 
@@ -110,8 +35,7 @@ RSpec.describe "Token-saving improvements" do
       context = RailsAiContext.introspect
       context[:view_templates] = {
         templates: { "cooks/show.html.erb" => { lines: 50, partials: [ "cooks/output" ], stimulus: [ "cook-status" ] } },
-        partials: { "cooks/_output.html.erb" => { lines: 100, fields: %w[confidence_score strategy_brief], helpers: %w[render_markdown] } },
-        ui_patterns: {}
+        partials: { "cooks/_output.html.erb" => { lines: 100, fields: %w[confidence_score strategy_brief], helpers: %w[render_markdown] } }
       }
       allow(RailsAiContext::Tools::GetView).to receive(:cached_context).and_return(context)
       result = RailsAiContext::Tools::GetView.call(controller: "cooks", detail: "standard")
@@ -155,7 +79,7 @@ RSpec.describe "Token-saving improvements" do
           }
         },
         models: {}, routes: { total_routes: 0 }, gems: {}, conventions: {},
-        view_templates: { ui_patterns: {} }
+        view_templates: { templates: {}, partials: {} }
       }
     end
 

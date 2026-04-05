@@ -8,7 +8,6 @@ module RailsAiContext
     class ClaudeSerializer
       include TestCommandDetection
       include StackOverviewHelper
-      include DesignSystemHelper
       include ToolGuideHelper
       include CompactSerializerHelper
 
@@ -35,7 +34,6 @@ module RailsAiContext
         lines.concat(render_key_models)
         lines.concat(render_notable_gems)
         lines.concat(render_architecture)
-        lines.concat(render_ui_patterns)
         lines.concat(render_commands)
         lines.concat(render_warnings)
         lines.concat(render_footer)

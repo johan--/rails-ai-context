@@ -85,12 +85,6 @@ module RailsAiContext
           lines << "- Components: #{parts.join(', ')}"
         end
 
-        a11y = ctx[:accessibility]
-        if a11y.is_a?(Hash) && !a11y[:error] && a11y[:summary]
-          score = a11y.dig(:summary, :score_label)
-          lines << "- Accessibility: #{score}" if score
-        end
-
         perf = ctx[:performance]
         if perf.is_a?(Hash) && !perf[:error] && perf[:summary]
           total = perf.dig(:summary, :total_issues).to_i
@@ -124,17 +118,6 @@ module RailsAiContext
         end
         lines << "- ...#{controllers_hash.size - limit} more" if controllers_hash.size > limit
         lines
-      end
-
-      # Render a Stimulus controllers section from context[:stimulus].
-      # Returns lines or [] if no Stimulus controllers.
-      def render_stimulus_section(ctx = context)
-        stim = ctx[:stimulus]
-        return [] unless stim.is_a?(Hash) && !stim[:error]
-        controllers = stim[:controllers] || []
-        return [] if controllers.empty?
-        names = controllers.map { |c| c[:name] || c[:file]&.gsub("_controller.js", "") }.compact.sort
-        [ "", "## Stimulus controllers", names.join(", ") ]
       end
 
       # Render scopes and constants as a one-line extras summary for a model entry.

@@ -132,7 +132,7 @@ end
 
 `rails ai:context` generates **29 files** across all AI assistants:
 
-### Claude Code (6 files)
+### Claude Code (5 files)
 
 | File | Purpose | Notes |
 |------|---------|-------|
@@ -140,7 +140,6 @@ end
 | `.claude/rules/rails-schema.md` | Database table listing | Auto-loaded by Claude Code alongside CLAUDE.md. |
 | `.claude/rules/rails-models.md` | Model listing with associations | Auto-loaded by Claude Code alongside CLAUDE.md. |
 | `.claude/rules/rails-context.md` | Project context and conventions | Auto-loaded by Claude Code alongside CLAUDE.md. |
-| `.claude/rules/rails-ui-patterns.md` | UI patterns and design tokens | Auto-loaded by Claude Code alongside CLAUDE.md. |
 | `.claude/rules/rails-mcp-tools.md` | Full MCP tool reference | Parameters, detail levels, pagination, workflow guide. |
 
 ### OpenCode (3 files)
@@ -151,17 +150,16 @@ end
 | `app/models/AGENTS.md` | Model reference | Auto-loaded by OpenCode when reading files in `app/models/`. |
 | `app/controllers/AGENTS.md` | Controller reference | Auto-loaded by OpenCode when reading files in `app/controllers/`. |
 
-### Cursor (5 files)
+### Cursor (4 files)
 
 | File | Purpose | Notes |
 |------|---------|-------|
 | `.cursor/rules/rails-project.mdc` | Project overview | `alwaysApply: true` — loaded in every conversation. |
 | `.cursor/rules/rails-models.mdc` | Model reference | `globs: app/models/**/*.rb` — auto-attaches when editing models. |
 | `.cursor/rules/rails-controllers.mdc` | Controller reference | `globs: app/controllers/**/*.rb` — auto-attaches when editing controllers. |
-| `.cursor/rules/rails-ui-patterns.mdc` | UI patterns and design tokens | `globs: app/views/**/*.erb` — loaded when editing views. |
 | `.cursor/rules/rails-mcp-tools.mdc` | MCP tool reference | `alwaysApply: true` — always available. |
 
-### GitHub Copilot (6 files)
+### GitHub Copilot (5 files)
 
 | File | Purpose | Notes |
 |------|---------|-------|
@@ -169,7 +167,6 @@ end
 | `.github/instructions/rails-models.instructions.md` | Model context | `applyTo: app/models/**/*.rb` — loaded when editing models. |
 | `.github/instructions/rails-controllers.instructions.md` | Controller context | `applyTo: app/controllers/**/*.rb` — loaded when editing controllers. |
 | `.github/instructions/rails-context.instructions.md` | Project context and conventions | `applyTo: **/*` — loaded everywhere. |
-| `.github/instructions/rails-ui-patterns.instructions.md` | UI patterns and design tokens | `applyTo: app/views/**/*.erb` — loaded when editing views. |
 | `.github/instructions/rails-mcp-tools.instructions.md` | MCP tool reference | `applyTo: **/*` — loaded everywhere. |
 
 ### Generic (1 file)
@@ -261,7 +258,7 @@ rails ai:context:claude           # Use this instead (no quoting needed)
 
 ## CLI Tools
 
-All 39 MCP tools can be run directly from the terminal — no MCP server or AI client needed.
+All 38 MCP tools can be run directly from the terminal — no MCP server or AI client needed.
 
 ### Rake
 
@@ -325,7 +322,7 @@ The `tool_mode` is selected during `rails generate rails_ai_context:install`.
 
 ## MCP Tools — Full Reference
 
-All 39 tools are **read-only** and **idempotent** — they never modify your application or database.
+All 38 tools are **read-only** and **idempotent** — they never modify your application or database.
 
 ### rails_get_schema
 
@@ -706,33 +703,6 @@ rails_analyze_feature(feature: "orders")
 ```
 
 **Returns:** Markdown with sections for Models (with columns, associations, validations, scopes, enums), Controllers (with actions and filters), Routes, Services (with methods), Jobs (with queue/retry), Views (with partials and Stimulus refs), Stimulus controllers (with targets/values/actions), Tests (with counts), Related models, Concerns, Callbacks, Channels, Mailers, and Environment dependencies. Each section shows match counts.
-
-### rails_get_design_system
-
-Returns the app's design system: color palette with semantic roles, component patterns with real HTML examples from actual views, typography scale, layout conventions, responsive breakpoints, and interactive state patterns.
-
-**Parameters:**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `detail` | string | `summary` (palette + components), `standard` (+ canonical page examples + design rules, default), `full` (+ typography, responsive, dark mode, animations, design tokens) |
-
-**Examples:**
-
-```
-rails_get_design_system()
-  → Color palette (primary, danger, success), component patterns (buttons, cards, inputs),
-    canonical page examples (form page, list page), design rules
-
-rails_get_design_system(detail: "summary")
-  → Compact: color roles + component class strings only
-
-rails_get_design_system(detail: "full")
-  → Everything: + typography scale, responsive breakpoints, interactive states,
-    dark mode patterns, animations, icon system, design tokens, shared partials
-```
-
-**Returns:** Structured design system reference. Includes real HTML/ERB snippets from the app's actual views as canonical examples, semantic color roles (primary for CTAs, danger for destructive), component variants, typography hierarchy, spacing scale, and explicit design rules for AI to follow.
 
 ### rails_security_scan
 
@@ -1148,7 +1118,7 @@ RailsAiContext.configure do |config|
 end
 ```
 
-Both transports are **read-only** — they expose the same 39 tools and never modify your app.
+Both transports are **read-only** — they expose the same 38 tools and never modify your app.
 
 ---
 
@@ -1159,7 +1129,7 @@ Both transports are **read-only** — they expose the same 39 tools and never mo
 RailsAiContext.configure do |config|
   # --- Introspectors ---
 
-  # Presets: :full (33 introspectors, default) or :standard (19)
+  # Presets: :full (31 introspectors, default) or :standard (17)
   config.preset = :full
 
   # Cherry-pick on top of a preset
@@ -1274,7 +1244,7 @@ end
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `preset` | Symbol | `:full` | Introspector preset (`:full` or `:standard`) |
-| `introspectors` | Array | 32 (full preset) | Which introspectors to run |
+| `introspectors` | Array | 31 (full preset) | Which introspectors to run |
 | `context_mode` | Symbol | `:compact` | `:compact` or `:full` |
 | `claude_max_lines` | Integer | `150` | Max lines for CLAUDE.md in compact mode |
 | `max_tool_response_chars` | Integer | `200_000` | Safety cap for MCP tool responses |
@@ -1332,7 +1302,7 @@ All split rules include an app overview file, so no context is lost when root fi
 
 ## Introspectors — Full List
 
-### Standard preset (19 introspectors)
+### Standard preset (17 introspectors)
 
 Core Rails structure only. Use `config.preset = :standard` for a lighter footprint.
 
@@ -1349,16 +1319,14 @@ Core Rails structure only. Use `config.preset = :standard` for a lighter footpri
 | `migrations` | Total count, schema version, pending migrations, recent migration history with detected actions (create_table, add_column, etc.), migration statistics. |
 | `config` | Cache store, session store, timezone, queue adapter, mailer settings, middleware stack, initializers, credentials status, CurrentAttributes classes. |
 | `stimulus` | Stimulus controllers with targets, values (with types), actions, outlets, classes. Extracted from JS/TS files. |
-| `view_templates` | View file contents, partial references, Stimulus data attributes, UI pattern extraction, model field usage in partials. |
-| `design_tokens` | Auto-detects CSS framework (Tailwind v3/v4, Bootstrap, Sass, plain CSS) and extracts design tokens from config files and built CSS. |
+| `view_templates` | View file contents, partial references, Stimulus data attributes, model field usage in partials. |
 | `components` | ViewComponent/Phlex components: props, slots, previews, sidecar assets, usage examples. |
 | `turbo` | Turbo Frames (IDs and files), Turbo Stream templates, model broadcasts (`broadcasts_to`, `broadcasts`). |
 | `auth` | Devise models with modules, Rails 8 built-in auth, has_secure_password, Pundit policies, CanCanCan, CORS config, CSP config. |
-| `accessibility` | ARIA attributes, semantic HTML elements, screen reader text, alt text coverage, landmark roles, accessibility score. |
 | `performance` | N+1 query risks, missing counter_cache, missing FK indexes, Model.all anti-patterns, eager load candidates. |
 | `i18n` | Default locale, available locales, locale files with key counts, backend class, parse errors. |
 
-### Full preset (33 introspectors) — default
+### Full preset (31 introspectors) — default
 
 Includes all standard introspectors plus:
 
@@ -1481,11 +1449,11 @@ OpenCode uses **per-directory lazy-loading**: when the agent reads a file, it wa
 
 | Setup | Coverage | Notes |
 |-------|----------|-------|
-| Rails full-stack (ERB + Hotwire) | 32/32 | All introspectors relevant |
-| Rails + Inertia.js (React/Vue) | ~25/32 | Views/Turbo partially useful, backend fully covered |
-| Rails API + React/Next.js SPA | ~23/32 | Schema, models, routes, API, auth, jobs — all covered |
-| Rails API + mobile app | ~23/32 | Same as SPA — backend introspection is identical |
-| Rails engine (mountable gem) | ~18/32 | Core introspectors (schema, models, routes, gems) work |
+| Rails full-stack (ERB + Hotwire) | 31/31 | All introspectors relevant |
+| Rails + Inertia.js (React/Vue) | ~25/31 | Views/Turbo partially useful, backend fully covered |
+| Rails API + React/Next.js SPA | ~23/31 | Schema, models, routes, API, auth, jobs — all covered |
+| Rails API + mobile app | ~23/31 | Same as SPA — backend introspection is identical |
+| Rails engine (mountable gem) | ~18/31 | Core introspectors (schema, models, routes, gems) work |
 
 Frontend introspectors (views, Turbo, Stimulus, assets) degrade gracefully — they report nothing when those features aren't present.
 

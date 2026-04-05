@@ -7,7 +7,6 @@ module RailsAiContext
     # .cursorrules is deprecated by Cursor; this is the recommended format.
     class CursorRulesSerializer
       include StackOverviewHelper
-      include DesignSystemHelper
       include ToolGuideHelper
 
       attr_reader :context
@@ -25,7 +24,6 @@ module RailsAiContext
           File.join(rules_dir, "rails-project.mdc") => render_project_rule,
           File.join(rules_dir, "rails-models.mdc") => render_models_rule,
           File.join(rules_dir, "rails-controllers.mdc") => render_controllers_rule,
-          File.join(rules_dir, "rails-ui-patterns.mdc") => render_ui_patterns_rule,
           File.join(rules_dir, "rails-mcp-tools.mdc") => render_mcp_tools_rule
         }
 
@@ -157,45 +155,11 @@ module RailsAiContext
         lines.join("\n")
       end
 
-      def render_ui_patterns_rule
-        vt = context[:view_templates]
-        return nil unless vt.is_a?(Hash) && !vt[:error]
-        components = vt.dig(:ui_patterns, :components) || []
-        return nil if components.empty?
-
-        lines = [
-          "---",
-          "globs:",
-          "  - \"app/views/**/*.erb\"",
-          "alwaysApply: false",
-          "---",
-          ""
-        ]
-
-        lines.concat(render_design_system_full(context))
-
-        # Shared partials
-        begin
-          shared_dir = File.join(project_root, "app", "views", "shared")
-          if Dir.exist?(shared_dir)
-            partials = Dir.glob(File.join(shared_dir, "_*.html.erb")).map { |f| File.basename(f) }.sort
-            if partials.any?
-              lines << "" << "## Shared partials"
-              partials.each { |p| lines << "- #{p}" }
-            end
-          end
-        rescue => e; $stderr.puts "[rails-ai-context] Serializer section skipped: #{e.message}"; end
-
-        lines.concat(render_stimulus_section(context))
-
-        lines.join("\n")
-      end
-
       # Always-on MCP tool reference — strongest enforcement point for Cursor
       def render_mcp_tools_rule
         lines = [
           "---",
-          "description: \"Rails tools (39) — MANDATORY, use before reading any reference files\"",
+          "description: \"Rails tools (38) — MANDATORY, use before reading any reference files\"",
           "alwaysApply: true",
           "---",
           ""

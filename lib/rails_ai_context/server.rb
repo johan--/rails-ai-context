@@ -23,7 +23,6 @@ module RailsAiContext
       Tools::GetEditContext,
       Tools::Validate,
       Tools::AnalyzeFeature,
-      Tools::GetDesignSystem,
       Tools::SecurityScan,
       Tools::GetConcern,
       Tools::GetCallbacks,

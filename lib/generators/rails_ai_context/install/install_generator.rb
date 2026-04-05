@@ -175,7 +175,7 @@ module RailsAiContext
             #   :full     — all #{RailsAiContext::Configuration::PRESETS[:full].size} introspectors (default)
             #   :standard — #{RailsAiContext::Configuration::PRESETS[:standard].size} core introspectors (schema, models, routes, jobs, gems,
             #               conventions, controllers, tests, migrations, stimulus,
-            #               view_templates, design_tokens, config, components)
+            #               view_templates, config, components)
             # config.preset = :full
 
             # Context mode: :compact (default, ≤150 lines) or :full (dumps everything)
@@ -429,6 +429,11 @@ module RailsAiContext
 
         require "rails_ai_context"
 
+        # One-time v5.0.0 legacy UI-pattern files cleanup prompt
+        RailsAiContext::LegacyCleanup.prompt_legacy_files(
+          @selected_formats, root: Rails.root
+        )
+
         @selected_formats.each do |fmt|
           begin
             result = RailsAiContext.generate_context(format: fmt)
@@ -454,9 +459,9 @@ module RailsAiContext
         say ""
         say "Commands:", :yellow
         say "  rails ai:context         # Regenerate context files"
-        say "  rails 'ai:tool[schema]'    # Run any of the 39 tools from CLI"
+        say "  rails 'ai:tool[schema]'    # Run any of the 38 tools from CLI"
         if @tool_mode == :mcp
-          say "  rails ai:serve           # Start MCP server (39 live tools)"
+          say "  rails ai:serve           # Start MCP server (38 live tools)"
         end
         say "  rails ai:doctor          # Check AI readiness"
         say "  rails ai:inspect         # Print introspection summary"

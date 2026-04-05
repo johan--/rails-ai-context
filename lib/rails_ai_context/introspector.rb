@@ -69,7 +69,6 @@ module RailsAiContext
       when :controllers    then Introspectors::ControllerIntrospector.new(app)
       when :views          then Introspectors::ViewIntrospector.new(app)
       when :view_templates then Introspectors::ViewTemplateIntrospector.new(app)
-      when :design_tokens  then Introspectors::DesignTokenIntrospector.new(app)
       when :turbo          then Introspectors::TurboIntrospector.new(app)
       when :i18n           then Introspectors::I18nIntrospector.new(app)
       when :config         then Introspectors::ConfigIntrospector.new(app)
@@ -88,7 +87,6 @@ module RailsAiContext
       when :engines         then Introspectors::EngineIntrospector.new(app)
       when :multi_database  then Introspectors::MultiDatabaseIntrospector.new(app)
       when :components      then Introspectors::ComponentIntrospector.new(app)
-      when :accessibility   then Introspectors::AccessibilityIntrospector.new(app)
       when :performance     then Introspectors::PerformanceIntrospector.new(app)
       when :frontend_frameworks then Introspectors::FrontendFrameworkIntrospector.new(app)
       else

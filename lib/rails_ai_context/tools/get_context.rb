@@ -29,7 +29,7 @@ module RailsAiContext
           include: {
             type: "array",
             items: { type: "string" },
-            description: "Additional context to bundle: 'stimulus', 'turbo', 'services', 'jobs', 'conventions', 'design', 'helpers', 'env', 'callbacks'. Appends these to any mode."
+            description: "Additional context to bundle: 'stimulus', 'turbo', 'services', 'jobs', 'conventions', 'helpers', 'env', 'callbacks'. Appends these to any mode."
           }
         }
       )
@@ -255,7 +255,6 @@ module RailsAiContext
         "services"    => -> { GetServicePattern.call(detail: "standard") },
         "jobs"        => -> { GetJobPattern.call(detail: "standard") },
         "conventions" => -> { GetConventions.call },
-        "design"      => -> { GetDesignSystem.call(detail: "summary") },
         "helpers"     => -> { GetHelperMethods.call(detail: "standard") },
         "env"         => -> { GetEnv.call(detail: "summary") },
         "callbacks"   => -> { GetCallbacks.call(detail: "standard") },

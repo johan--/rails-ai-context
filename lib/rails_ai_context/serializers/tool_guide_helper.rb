@@ -24,21 +24,21 @@ module RailsAiContext
       end
 
       def tools_header
-        "## Tools (39) — MANDATORY, Use Before Read"
+        "## Tools (38) — MANDATORY, Use Before Read"
       end
 
       def tools_intro
         case tool_mode
         when :cli
           [
-            "This project has 39 introspection tools. **MANDATORY — use these instead of reading files.**",
+            "This project has 38 introspection tools. **MANDATORY — use these instead of reading files.**",
             "They return ground truth from the running app: real schema, real associations, real filters — not guesses.",
             "Read files ONLY when you are about to Edit them.",
             ""
           ]
         else
           [
-            "This project has 39 MCP tools via `rails ai:serve` (configured in `.mcp.json`).",
+            "This project has 38 MCP tools via `rails ai:serve` (configured in `.mcp.json`).",
             "**MANDATORY — use these instead of reading files.** They return ground truth from the running app:",
             "real schema, real associations, real filters — not guesses from file reads.",
             "Read files ONLY when you are about to Edit them.",
@@ -120,9 +120,9 @@ module RailsAiContext
           "3. #{tool_call_inline("rails_validate", "files:[\"app/controllers/cooks_controller.rb\"], level:\"rails\"", "validate", "files=app/controllers/cooks_controller.rb level=rails")}",
           "",
           "**Build or modify a view:**",
-          "1. #{tool_call_inline("rails_get_design_system", "detail:\"standard\"", "design_system", "detail=standard")} — get copy-paste HTML/ERB patterns",
-          "2. #{tool_call_inline("rails_get_view", "controller:\"cooks\"", "view", "controller=cooks")} — existing templates, partials, Stimulus refs",
-          "3. #{tool_call_inline("rails_get_partial_interface", "partial:\"shared/status_badge\"", "partial_interface", "partial=shared/status_badge")} — partial locals contract",
+          "1. #{tool_call_inline("rails_get_view", "controller:\"cooks\"", "view", "controller=cooks")} — existing templates, partials, Stimulus refs",
+          "2. #{tool_call_inline("rails_get_partial_interface", "partial:\"shared/status_badge\"", "partial_interface", "partial=shared/status_badge")} — partial locals contract",
+          "3. #{tool_call_inline("rails_get_component_catalog", "component:\"Button\"", "component_catalog", "component=Button")} — ViewComponent/Phlex props, slots, previews",
           "4. Read the view file, make your edit",
           "5. #{tool_call_inline("rails_validate", "files:[\"app/views/cooks/index.html.erb\"]", "validate", "files=app/views/cooks/index.html.erb")}",
           "",
@@ -189,7 +189,7 @@ module RailsAiContext
       end
 
       def tools_table
-        lines = [ "### All 39 Tools", "" ]
+        lines = [ "### All 38 Tools", "" ]
         lines.concat(build_tools_table(include_mcp: tool_mode != :cli))
         lines
       end
@@ -207,7 +207,6 @@ module RailsAiContext
         [ 'rails_get_model_details(model:"X")', "model_details", "model=X", "Associations, validations, scopes, enums, macros, delegations" ],
         [ 'rails_get_routes(controller:"X")', "routes", "controller=X", "Routes with code-ready helpers and controller filters inline" ],
         [ 'rails_get_view(controller:"X")', "view", "controller=X", "Templates with ivars, Turbo wiring, Stimulus refs, partial locals" ],
-        [ "rails_get_design_system", "design_system", nil, "Canonical HTML/ERB copy-paste patterns for buttons, inputs, cards" ],
         [ 'rails_get_stimulus(controller:"X")', "stimulus", "controller=X", "Targets, values, actions + HTML data-attributes + view lookup" ],
         [ 'rails_get_test_info(model:"X")', "test_info", "model=X", "Tests + fixture contents + test template" ],
         [ 'rails_get_concern(name:"X", detail:"full")', "concern", "name=X detail=full", "Concern methods with source + which models include it" ],
@@ -290,7 +289,7 @@ module RailsAiContext
         all_tools = %w[
           rails_get_context rails_analyze_feature rails_search_code rails_get_controllers
           rails_validate rails_get_schema rails_get_model_details rails_get_routes
-          rails_get_view rails_get_design_system rails_get_stimulus rails_get_test_info
+          rails_get_view rails_get_stimulus rails_get_test_info
           rails_get_concern rails_get_callbacks rails_get_edit_context
           rails_get_service_pattern rails_get_job_pattern rails_get_env
           rails_get_partial_interface rails_get_turbo_map rails_get_helper_methods

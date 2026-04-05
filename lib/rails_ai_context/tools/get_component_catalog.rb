@@ -66,8 +66,7 @@ module RailsAiContext
               "No components found in app/components/.\n\n" \
               "This app may use ERB partials instead of ViewComponent/Phlex. Try:\n" \
               "- `rails_get_partial_interface(partial:\"shared/partial_name\")` — partial locals contract + usage\n" \
-              "- `rails_get_view(controller:\"name\")` — view templates with partial/Stimulus references\n" \
-              "- `rails_get_design_system` — UI component patterns extracted from views"
+              "- `rails_get_view(controller:\"name\")` — view templates with partial/Stimulus references"
             )
           end
           text_response(render_catalog(components, data[:summary], detail, offset: offset, limit: limit))

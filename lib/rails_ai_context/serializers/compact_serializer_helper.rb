@@ -4,7 +4,7 @@ module RailsAiContext
   module Serializers
     # Shared rendering methods for compact-mode serializers (Claude, OpenCode).
     # Include in any serializer that has a `context` reader and includes
-    # StackOverviewHelper, DesignSystemHelper, ToolGuideHelper, and TestCommandDetection.
+    # StackOverviewHelper, ToolGuideHelper, and TestCommandDetection.
     module CompactSerializerHelper
       private
 
@@ -110,10 +110,6 @@ module RailsAiContext
           "- `rails db:migrate` — run pending migrations",
           ""
         ]
-      end
-
-      def render_ui_patterns
-        render_design_system(context, max_lines: 30)
       end
 
       def render_warnings

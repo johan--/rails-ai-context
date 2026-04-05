@@ -8,7 +8,6 @@ module RailsAiContext
     class CopilotSerializer
       include TestCommandDetection
       include StackOverviewHelper
-      include DesignSystemHelper
       include ToolGuideHelper
 
       attr_reader :context
@@ -88,9 +87,6 @@ module RailsAiContext
             lines << ""
           end
         end
-
-        # Design System
-        lines.concat(render_design_system(context, max_lines: 35))
 
         # Tools reference (respects tool_mode)
         lines.concat(render_tools_guide)

@@ -6,7 +6,6 @@ module RailsAiContext
     # for GitHub Copilot path-specific instructions.
     class CopilotInstructionsSerializer
       include StackOverviewHelper
-      include DesignSystemHelper
       include ToolGuideHelper
 
       attr_reader :context
@@ -22,7 +21,6 @@ module RailsAiContext
           File.join(dir, "rails-context.instructions.md") => render_context_instructions,
           File.join(dir, "rails-models.instructions.md") => render_models_instructions,
           File.join(dir, "rails-controllers.instructions.md") => render_controllers_instructions,
-          File.join(dir, "rails-ui-patterns.instructions.md") => render_ui_patterns_instructions,
           File.join(dir, "rails-mcp-tools.instructions.md") => render_mcp_tools_instructions
         }
 
@@ -133,26 +131,6 @@ module RailsAiContext
         ]
 
         lines.concat(render_compact_controllers_list(controllers))
-
-        lines.join("\n")
-      end
-
-      def render_ui_patterns_instructions
-        vt = context[:view_templates]
-        return nil unless vt.is_a?(Hash) && !vt[:error]
-        components = vt.dig(:ui_patterns, :components) || []
-        return nil if components.empty?
-
-        lines = [
-          "---",
-          "applyTo: \"app/views/**/*.erb\"",
-          "---",
-          ""
-        ]
-
-        lines.concat(render_design_system_full(context))
-
-        lines.concat(render_stimulus_section(context))
 
         lines.join("\n")
       end

@@ -71,12 +71,12 @@ module RailsAiContext
 
     PRESETS = {
       standard: %i[schema models routes jobs gems conventions controllers tests migrations stimulus
-                   view_templates design_tokens config components
-                   turbo auth accessibility performance i18n],
-      full: %i[schema models routes jobs gems conventions stimulus database_stats controllers views view_templates design_tokens turbo
+                   view_templates config components
+                   turbo auth performance i18n],
+      full: %i[schema models routes jobs gems conventions stimulus database_stats controllers views view_templates turbo
                i18n config active_storage action_text auth api tests rake_tasks assets
                devops action_mailbox migrations seeds middleware engines multi_database
-               components accessibility performance frontend_frameworks]
+               components performance frontend_frameworks]
     }.freeze
 
     # MCP server settings
@@ -143,7 +143,7 @@ module RailsAiContext
     attr_accessor :max_file_size          # Per-file read limit for tools (default: 2MB)
     attr_accessor :max_test_file_size     # Test file read limit (default: 500KB)
     attr_accessor :max_schema_file_size   # schema.rb / structure.sql parse limit (default: 10MB)
-    attr_accessor :max_view_total_size    # Total aggregated view content for UI patterns (default: 5MB)
+    attr_accessor :max_view_total_size    # Total aggregated view content for template scanning (default: 5MB)
     attr_accessor :max_view_file_size     # Per-view file during aggregation (default: 500KB)
     attr_accessor :max_search_results     # Max search results per call (default: 100)
     attr_accessor :max_validate_files     # Max files per validate call (default: 20)
@@ -151,7 +151,7 @@ module RailsAiContext
     # Additional MCP tool classes to register alongside built-in tools
     attr_accessor :custom_tools
 
-    # Built-in tool names to skip (e.g. %w[rails_security_scan rails_get_design_system])
+    # Built-in tool names to skip (e.g. %w[rails_security_scan rails_query])
     attr_accessor :skip_tools
 
     # Which AI tools to generate context for (selected during install)

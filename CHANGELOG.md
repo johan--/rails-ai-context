@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] — 2026-04-05
+
+### Removed (BREAKING)
+
+This release removes the Design & Styling surface and the Accessibility rule surface. When AI assistants consumed pre-digested design/styling context (color palettes, Tailwind class strings, canonical HTML/ERB snippets), they produced poor UI/UX output by blindly copying class strings instead of understanding visual hierarchy. The accessibility surface was asymmetric (Claude-only static rule file, no live MCP tool) and provided generic best-practice rules that didn't earn their keep.
+
+**Design system:**
+- **Removed `rails_get_design_system` MCP tool** — tool count is now **38** (was 39). Tool class `RailsAiContext::Tools::GetDesignSystem` deleted.
+- **Removed `:design_tokens` introspector** — class `RailsAiContext::Introspectors::DesignTokensIntrospector` deleted.
+- **Removed `ui_patterns`, `canonical_examples`, `shared_partials` keys** from `ViewTemplateIntrospector` output. The introspector now returns only `templates` and `partials`.
+- **Removed `DesignSystemHelper` serializer module** — module `RailsAiContext::Serializers::DesignSystemHelper` deleted. Consumers no longer receive UI Patterns sections in rule files or compact output.
+- **Removed `"design"` option** from the `include:` parameter of `rails_get_context`. Valid options are now: `schema`, `models`, `routes`, `gems`, `conventions`.
+
+**Accessibility:**
+- **Removed `:accessibility` introspector** — class `RailsAiContext::Introspectors::AccessibilityIntrospector` deleted. `ctx[:accessibility]` no longer populated.
+- **Removed `discover_accessibility` cross-cut** from `rails_analyze_feature`. The tool no longer emits a `## Accessibility` section with per-feature a11y findings.
+- **Removed Accessibility line** from root-file Stack Overview (no more "Accessibility: Good/OK/Needs work" label).
+
+**Preset counts:** `:full` is now **31** (was 33); `:standard` is now **17** (was 19). Both lost `:design_tokens` and `:accessibility`.
+
+**Legacy rule files no longer generated:**
+- `.claude/rules/rails-ui-patterns.md`
+- `.cursor/rules/rails-ui-patterns.mdc`
+- `.github/instructions/rails-ui-patterns.instructions.md`
+- `.claude/rules/rails-accessibility.md`
+
+### Migration notes
+
+- **Legacy files are NOT auto-deleted.** On first run after upgrade (via `rake ai:context`, `rails-ai-context context`, install generator, or watcher), the gem detects stale `rails-ui-patterns.*` and `rails-accessibility.md` files and prompts interactively in TTY sessions, or warns (non-destructive) in non-TTY sessions. Answer `y` to remove, or delete the files manually.
+- **If you depended on `rails_get_design_system`**, replace with `rails_get_component_catalog` (component-based) or read view files directly with `rails_read_file` / `rails_search_code`.
+- **If you depended on `include: "design"`** in `rails_get_context`, remove that option.
+- **If you depended on `ctx[:accessibility]`** (custom tools / serializers), that key is gone. Use standard a11y linters (axe-core, lighthouse) in your test suite instead.
+- **The "Build or modify a view" workflow** in tool guides now starts with `rails_get_component_catalog` instead of `rails_get_design_system`.
+
+### Why
+
+AI assistants that consume pre-digested summaries produce worse output than AI that reads actual source files. For design systems, class-string copying defeats the mental model required for cohesive visual hierarchy. For accessibility, generic rules ("add alt text") are universal knowledge that AI already has — the static counts didn't add actionable context, and the asymmetric distribution (Claude-only rule file, no live tool) was incoherent with the gem's charter. The gem's charter is ground truth for Rails structure (schema, associations, routes, controllers) — design-system and accessibility summaries were adjacent to that charter and actively counterproductive or inert.
+
 ## [4.7.0] — 2026-04-05
 
 ### Added

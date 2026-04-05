@@ -23,7 +23,7 @@ class RailsAiContextCLI < Thor
     # Let Thor pass unknown options through to ToolRunner for the tool command
     stop_on_unknown_option! :tool
 
-    desc "tool [NAME]", "Run an MCP tool (39 available). Use --list to see all."
+    desc "tool [NAME]", "Run an MCP tool (38 available). Use --list to see all."
     option :json, type: :boolean, default: false, desc: "Output as JSON envelope"
     option :list, type: :boolean, default: false, desc: "List available tools"
     def tool(name = nil, *args)
@@ -73,6 +73,13 @@ class RailsAiContextCLI < Thor
     option :format, type: :string, default: nil, desc: "Format: claude, cursor, copilot, json, all (default: from config)"
     def context
       boot_rails!
+
+      if options[:format]
+        cleanup_tools = options[:format] == "all" ? nil : [ options[:format].to_sym ]
+      else
+        cleanup_tools = ::RailsAiContext.configuration.ai_tools
+      end
+      ::RailsAiContext::LegacyCleanup.prompt_legacy_files(cleanup_tools, root: Dir.pwd)
 
       $stderr.puts "Introspecting Rails app..."
 
@@ -150,6 +157,12 @@ class RailsAiContextCLI < Thor
 
       # --- Cleanup removed tools ---
       cleanup_removed_tools(previous_tools, ai_tools) if previous_tools&.any?
+
+      # --- One-time v5.0.0 legacy UI-pattern files cleanup prompt ---
+      # Boot Rails lazily: we need the gem loaded to access LegacyCleanup.
+      # But we avoid booting Rails here — require just the legacy_cleanup file.
+      require_relative "../lib/rails_ai_context/legacy_cleanup"
+      ::RailsAiContext::LegacyCleanup.prompt_legacy_files(ai_tools, root: Dir.pwd)
 
       # --- Write .rails-ai-context.yml ---
       write_yaml_config(ai_tools, tool_mode)
@@ -362,7 +375,7 @@ class RailsAiContextCLI < Thor
       $stderr.puts ""
       $stderr.puts "Commands:"
       $stderr.puts "  rails-ai-context context    # Regenerate context files"
-      $stderr.puts "  rails-ai-context tool NAME  # Run any of the 39 tools"
+      $stderr.puts "  rails-ai-context tool NAME  # Run any of the 38 tools"
       if tool_mode == :mcp
         $stderr.puts "  rails-ai-context serve      # Start MCP server"
       end

@@ -35,19 +35,10 @@ RSpec.describe "Cursor MDC compliance" do
           "PostsController" => { actions: %w[index show] }
         }
       },
-      view_templates: {
-        ui_patterns: {
-          components: [
-            { type: :button, label: "primary button", classes: "btn btn-primary" },
-            { type: :button, label: "danger button", classes: "btn btn-danger" },
-            { type: :input, label: "text input", classes: "form-control" }
-          ]
-        }
-      },
+      view_templates: { templates: {}, partials: {} },
       stimulus: {},
       turbo: {}, auth: {}, api: {}, i18n: {}, active_storage: {},
-      action_text: {}, assets: {}, engines: {}, multi_database: {},
-      design_tokens: {}
+      action_text: {}, assets: {}, engines: {}, multi_database: {}
     }
   end
 
@@ -154,7 +145,7 @@ RSpec.describe "Cursor MDC compliance" do
     end
 
     it "auto-attached rules have alwaysApply: false" do
-      %w[rails-models.mdc rails-controllers.mdc rails-ui-patterns.mdc].each do |filename|
+      %w[rails-models.mdc rails-controllers.mdc].each do |filename|
         file = generated_files[filename]
         next unless file
         fm = parse_frontmatter(file[:content])
@@ -241,14 +232,14 @@ RSpec.describe "Cursor MDC compliance" do
       expect(file[:content]).to include("PostsController")
     end
 
-    it "MCP tools rule includes all 39 tools" do
+    it "MCP tools rule includes all 38 tools" do
       file = generated_files["rails-mcp-tools.mdc"]
       content = file[:content]
       %w[
         rails_get_schema rails_get_model_details rails_get_routes
         rails_get_controllers rails_search_code rails_validate
         rails_analyze_feature rails_get_context rails_get_view
-        rails_get_stimulus rails_get_design_system rails_get_test_info
+        rails_get_stimulus rails_get_test_info
         rails_get_conventions rails_get_concern rails_get_callbacks
         rails_get_edit_context rails_get_service_pattern rails_get_job_pattern
         rails_get_env rails_get_partial_interface rails_get_turbo_map
@@ -294,8 +285,7 @@ RSpec.describe "Cursor MDC compliance" do
       end
     end
 
-    it "skips ui-patterns rule when no UI patterns" do
-      context[:view_templates] = {}
+    it "never generates ui-patterns rule (removed in v5.0.0)" do
       Dir.mktmpdir do |dir|
         result = RailsAiContext::Serializers::CursorRulesSerializer.new(context).call(dir)
         expect(result[:written].none? { |f| f.include?("rails-ui-patterns.mdc") }).to be true
