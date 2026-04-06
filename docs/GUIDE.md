@@ -308,10 +308,12 @@ Short names are resolved automatically:
 The `tool_mode` config controls how tool references appear in generated context files:
 
 ```ruby
-RailsAiContext.configure do |config|
-  # :mcp (default) — MCP primary, CLI as fallback
-  # :cli — CLI only, no MCP server needed
-  config.tool_mode = :mcp
+if defined?(RailsAiContext)
+  RailsAiContext.configure do |config|
+    # :mcp (default) — MCP primary, CLI as fallback
+    # :cli — CLI only, no MCP server needed
+    config.tool_mode = :mcp
+  end
 end
 ```
 
@@ -1112,11 +1114,13 @@ rails ai:serve_http
 Or auto-mount inside your Rails app (no separate process):
 
 ```ruby
-RailsAiContext.configure do |config|
-  config.auto_mount = true
-  config.http_path  = "/mcp"   # default
-  config.http_port  = 6029     # default
-  config.http_bind  = "127.0.0.1"  # default (localhost only)
+if defined?(RailsAiContext)
+  RailsAiContext.configure do |config|
+    config.auto_mount = true
+    config.http_path  = "/mcp"       # default
+    config.http_port  = 6029          # default
+    config.http_bind  = "127.0.0.1"  # default (localhost only)
+  end
 end
 ```
 
@@ -1295,8 +1299,10 @@ By default, `rails ai:context` generates root files (CLAUDE.md, AGENTS.md, etc.)
 **Skip root files:** If you prefer to maintain root files yourself and only want split rules (`.claude/rules/`, `.cursor/rules/`, `.github/instructions/`):
 
 ```ruby
-RailsAiContext.configure do |config|
-  config.generate_root_files = false
+if defined?(RailsAiContext)
+  RailsAiContext.configure do |config|
+    config.generate_root_files = false
+  end
 end
 ```
 
@@ -1547,14 +1553,16 @@ Live reload is **enabled by default** when the `listen` gem is available. No con
 ### Configuration
 
 ```ruby
-RailsAiContext.configure do |config|
-  # :auto (default) — enable if `listen` gem is available, skip silently otherwise
-  # true  — enable, raise if `listen` gem is missing
-  # false — disable entirely
-  config.live_reload = :auto
+if defined?(RailsAiContext)
+  RailsAiContext.configure do |config|
+    # :auto (default) — enable if `listen` gem is available, skip silently otherwise
+    # true  — enable, raise if `listen` gem is missing
+    # false — disable entirely
+    config.live_reload = :auto
 
-  # Debounce interval in seconds (default: 1.5)
-  config.live_reload_debounce = 1.5
+    # Debounce interval in seconds (default: 1.5)
+    config.live_reload_debounce = 1.5
+  end
 end
 ```
 

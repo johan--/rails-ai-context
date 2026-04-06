@@ -335,7 +335,7 @@ module RailsAiContext
 
           insert_point = configure_block_end_index(existing)
           if insert_point
-            existing = existing.insert(insert_point, "\n#{section_content}\n")
+            existing = existing.insert(insert_point, "\n#{reindent_section_content(section_content, existing)}\n")
             changes << "section: #{name}"
           end
         end
@@ -354,9 +354,11 @@ module RailsAiContext
       # Replace or uncomment a config line. Returns [new_content, changed?]
       def update_config_line(content, key, new_line)
         # Match both commented and uncommented versions of this config key
-        pattern = /^[ \t]*#?\s*#{Regexp.escape(key)}\s*=.*$/
+        pattern = /^([ \t]*)#?\s*#{Regexp.escape(key)}\s*=.*$/
         if content.match?(pattern)
-          updated = content.sub(pattern, new_line)
+          updated = content.sub(pattern) do
+            "#{Regexp.last_match(1)}#{new_line.lstrip}"
+          end
           [ updated, updated != content ]
         else
           # Key not found at all — don't add (it's in a section that will be added)
@@ -388,6 +390,22 @@ module RailsAiContext
 
         wrapped = "#{header}if defined?(RailsAiContext)\n#{indent_content(body)}end\n"
         [ wrapped, wrapped != content ]
+      end
+
+      def reindent_section_content(section_content, content)
+        indent = configure_body_indent(content)
+        section_content.lines.map do |line|
+          next line if line == "\n"
+
+          "#{indent}#{line.sub(/\A[ \t]{0,2}/, "")}"
+        end.join
+      end
+
+      def configure_body_indent(content)
+        match = content.match(/^([ \t]*)RailsAiContext\.configure do \|config\|$/)
+        return "  " unless match
+
+        "#{match[1]}  "
       end
 
       def guarded_initializer?(content)

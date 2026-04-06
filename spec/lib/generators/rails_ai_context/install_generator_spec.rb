@@ -79,8 +79,32 @@ RSpec.describe RailsAiContext::Generators::InstallGenerator do
       content = File.read(initializer_path)
 
       expect(content.scan("if defined?(RailsAiContext)").size).to eq(1)
-      expect(content).to include("# ── Introspection")
+      expect(content).to include("    config.ai_tools = %i[claude copilot]")
+      expect(content).to include("    # ── Introspection")
+      expect(content).to include("    # config.tool_mode = :mcp")
+      expect(content).not_to include("\n  config.ai_tools = %i[claude copilot]")
       expect(content).to match(/if defined\?\(RailsAiContext\)\n  RailsAiContext.configure do \|config\|.*# ── Introspection.*\n  end\nend\n/m)
+    end
+
+    it "preserves indentation when replacing config lines in guarded initializers" do
+      File.write(initializer_path, <<~RUBY)
+        # frozen_string_literal: true
+
+        if defined?(RailsAiContext)
+          RailsAiContext.configure do |config|
+            config.ai_tools = %i[claude]
+            config.tool_mode = :cli
+          end
+        end
+      RUBY
+
+      generator.create_initializer
+
+      content = File.read(initializer_path)
+
+      expect(content).to include("    config.ai_tools = %i[claude copilot]")
+      expect(content).to include("    config.tool_mode = :mcp   # MCP primary + CLI fallback")
+      expect(content).not_to include("\n  config.tool_mode = :mcp   # MCP primary + CLI fallback")
     end
   end
 end
