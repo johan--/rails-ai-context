@@ -45,7 +45,7 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
-    name: Publish to RubyGems
+    name: Publish to RubyGems + GitHub Release
 
     steps:
       - uses: actions/checkout@v6
@@ -69,13 +69,25 @@ jobs:
           fi
           echo "Version verified: $GEM_VERSION"
 
+      - name: Check if gem version already published
+        id: check_gem
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if gem search rails-ai-context --exact --versions | grep -q "$VERSION"; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Gem v$VERSION already on RubyGems — skipping push"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Push to RubyGems
+        if: steps.check_gem.outputs.already_published == 'false'
         uses: rubygems/release-gem@v1
 
       - name: Build gem for release asset
         run: gem build rails-ai-context.gemspec
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -125,13 +137,21 @@ jobs:
       - name: Login via GitHub OIDC
         run: mcp-publisher login github-oidc
 
-      - name: Update server.json version and mcpb URL
+      - name: Update server.json version, mcpb URL, and fileSha256
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           TAG="${GITHUB_REF#refs/tags/}"
           MCPB_URL="https://github.com/crisnahine/rails-ai-context/releases/download/${TAG}/rails-ai-context-mcp.mcpb"
-          jq --arg v "$VERSION" --arg url "$MCPB_URL" \
-            '.version = $v | .packages[0].identifier = $url' \
+
+          # Download mcpb from the release and compute its SHA256
+          gh release download "$TAG" --pattern "rails-ai-context-mcp.mcpb" --dir /tmp
+          SHA256=$(sha256sum /tmp/rails-ai-context-mcp.mcpb | awk '{print $1}')
+          echo "Computed fileSha256: $SHA256"
+
+          jq --arg v "$VERSION" --arg url "$MCPB_URL" --arg sha "$SHA256" \
+            '.version = $v | .packages[0].identifier = $url | .packages[0].fileSha256 = $sha' \
             server.json > server.tmp && mv server.tmp server.json
           echo "Publishing version $VERSION to MCP Registry"
           cat server.json
