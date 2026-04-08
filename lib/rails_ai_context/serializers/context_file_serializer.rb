@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "securerandom"
+require "set"
 
 module RailsAiContext
   module Serializers
@@ -18,6 +19,7 @@ module RailsAiContext
       FORMAT_MAP = {
         claude:    "CLAUDE.md",
         opencode:  "AGENTS.md",
+        codex:     "AGENTS.md",
         copilot:   ".github/copilot-instructions.md",
         json:      ".ai-context.json"
       }.freeze
@@ -44,6 +46,8 @@ module RailsAiContext
         written = []
         skipped = []
 
+        seen_root_files = Set.new
+
         formats.each do |fmt|
           next if SPLIT_ONLY_FORMATS.include?(fmt)
 
@@ -55,6 +59,10 @@ module RailsAiContext
 
           # Skip root files when generate_root_files is false
           next unless generate_root
+
+          # Deduplicate: skip if this root file was already written (e.g. AGENTS.md for both :opencode and :codex)
+          next if seen_root_files.include?(filename)
+          seen_root_files << filename
 
           filepath = File.join(output_dir, filename)
           FileUtils.mkdir_p(File.dirname(filepath))
@@ -77,10 +85,10 @@ module RailsAiContext
 
       def serialize(fmt)
         case fmt
-        when :json     then JsonSerializer.new(context).call
-        when :claude   then ClaudeSerializer.new(context).call
-        when :opencode then OpencodeSerializer.new(context).call
-        when :copilot  then CopilotSerializer.new(context).call
+        when :json             then JsonSerializer.new(context).call
+        when :claude           then ClaudeSerializer.new(context).call
+        when :opencode, :codex then OpencodeSerializer.new(context).call
+        when :copilot          then CopilotSerializer.new(context).call
         else MarkdownSerializer.new(context).call
         end
       end
@@ -154,6 +162,13 @@ module RailsAiContext
 
         if formats.include?(:copilot)
           result = CopilotInstructionsSerializer.new(context).call(output_dir)
+          written.concat(result[:written])
+          skipped.concat(result[:skipped])
+        end
+
+        # Codex reuses OpenCode's directory-level AGENTS.md split rules
+        if formats.include?(:codex) && !formats.include?(:opencode)
+          result = OpencodeRulesSerializer.new(context).call(output_dir)
           written.concat(result[:written])
           skipped.concat(result[:skipped])
         end

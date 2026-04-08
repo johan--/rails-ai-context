@@ -33,6 +33,8 @@ module RailsAiContext
         lines = [
           "---",
           "applyTo: \"**/*\"",
+          "name: \"Rails Project Overview\"",
+          "description: \"Rails version, database, models, routes, gems, architecture patterns\"",
           "---",
           "",
           "# #{context[:app_name] || 'Rails App'} — Overview",
@@ -93,6 +95,8 @@ module RailsAiContext
         lines = [
           "---",
           "applyTo: \"app/models/**/*.rb\"",
+          "name: \"Rails Models Reference\"",
+          "description: \"ActiveRecord models — associations, validations, scopes, enums\"",
           "---",
           "",
           "# ActiveRecord Models (#{models.size})",
@@ -122,6 +126,8 @@ module RailsAiContext
         lines = [
           "---",
           "applyTo: \"app/controllers/**/*.rb\"",
+          "name: \"Rails Controllers Reference\"",
+          "description: \"Controllers — actions, filters, strong parameters\"",
           "---",
           "",
           "# Controllers (#{controllers.size})",
@@ -139,6 +145,8 @@ module RailsAiContext
         lines = [
           "---",
           "applyTo: \"**/*\"",
+          "name: \"Rails MCP Tools\"",
+          "description: \"#{tool_count} introspection tools — schema, models, routes, controllers, search, testing, validation\"",
           "excludeAgent: \"code-review\"",
           "---",
           ""

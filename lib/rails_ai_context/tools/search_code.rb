@@ -202,15 +202,20 @@ module RailsAiContext
         # Claude
         cmd << "--glob=!CLAUDE.md"
         cmd << "--glob=!.claude/"
+        cmd << "--glob=!.mcp.json"
         # Cursor
         cmd << "--glob=!.cursor/"
         cmd << "--glob=!.cursorrules"
         # GitHub Copilot
         cmd << "--glob=!.github/copilot-instructions.md"
         cmd << "--glob=!.github/instructions/"
+        cmd << "--glob=!.vscode/mcp.json"
         # OpenCode
         cmd << "--glob=!AGENTS.md"
         cmd << "--glob=!**/AGENTS.md"
+        cmd << "--glob=!opencode.json"
+        # Codex CLI
+        cmd << "--glob=!.codex/"
         # JSON export
         cmd << "--glob=!.ai-context.json"
 
@@ -250,7 +255,7 @@ module RailsAiContext
         excluded = RailsAiContext.configuration.excluded_paths
         sensitive = RailsAiContext.configuration.sensitive_patterns
         test_dirs = %w[test/ spec/ features/]
-        ai_context_files = %w[CLAUDE.md AGENTS.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ .ai-context.json]
+        ai_context_files = %w[CLAUDE.md AGENTS.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ .vscode/mcp.json .codex/ .mcp.json opencode.json .ai-context.json]
 
         Dir.glob(File.join(search_path, glob)).each do |file|
           relative = file.sub("#{root}/", "")

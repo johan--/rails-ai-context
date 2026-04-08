@@ -26,6 +26,11 @@ module RailsAiContext
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
 
       def self.call(partial:, detail: "standard", server_context: nil)
+        # Guard: required parameter
+        if partial.nil? || partial.strip.empty?
+          return text_response("The `partial` parameter is required. Provide a partial path relative to app/views (e.g. 'shared/status_badge').")
+        end
+
         # Reject path traversal attempts
         if partial.include?("..") || partial.start_with?("/")
           return text_response("Path not allowed: #{partial}")

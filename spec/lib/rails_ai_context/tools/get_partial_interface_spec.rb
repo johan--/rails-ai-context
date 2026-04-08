@@ -56,6 +56,24 @@ RSpec.describe RailsAiContext::Tools::GetPartialInterface do
       expect(text).to include("not found")
     end
 
+    it "returns helpful message when partial is nil" do
+      result = described_class.call(partial: nil)
+      text = result.content.first[:text]
+      expect(text).to include("`partial` parameter is required")
+    end
+
+    it "returns helpful message when partial is empty string" do
+      result = described_class.call(partial: "")
+      text = result.content.first[:text]
+      expect(text).to include("`partial` parameter is required")
+    end
+
+    it "returns helpful message when partial is whitespace only" do
+      result = described_class.call(partial: "   ")
+      text = result.content.first[:text]
+      expect(text).to include("`partial` parameter is required")
+    end
+
     it "prevents path traversal" do
       result = described_class.call(partial: "../../../etc/passwd")
       text = result.content.first[:text]

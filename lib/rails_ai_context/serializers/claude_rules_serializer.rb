@@ -72,6 +72,12 @@ module RailsAiContext
         return nil if tables.empty?
 
         lines = [
+          "---",
+          "paths:",
+          '  - "db/schema.rb"',
+          '  - "db/migrate/**"',
+          "---",
+          "",
           "# Database Tables (#{tables.size})",
           "",
           "_Snapshot — may be stale after migrations. Use `rails_get_schema(table:\"name\")` for live data._",
@@ -152,6 +158,11 @@ module RailsAiContext
         return nil if models.empty?
 
         lines = [
+          "---",
+          "paths:",
+          '  - "app/models/**/*.rb"',
+          "---",
+          "",
           "# ActiveRecord Models (#{models.size})",
           "",
           "_Quick reference — use `rails_get_model_details(model:\"Name\")` for live data with resolved concerns and callbacks._",
@@ -213,6 +224,12 @@ module RailsAiContext
         return nil if components.empty?
 
         lines = [
+          "---",
+          "paths:",
+          '  - "app/components/**/*.rb"',
+          '  - "app/views/components/**"',
+          "---",
+          "",
           "# Components (#{components.size})",
           "",
           "ViewComponent and Phlex components available for reuse.",

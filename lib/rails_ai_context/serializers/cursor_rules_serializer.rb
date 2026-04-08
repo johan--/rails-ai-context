@@ -155,12 +155,12 @@ module RailsAiContext
         lines.join("\n")
       end
 
-      # Always-on MCP tool reference — strongest enforcement point for Cursor
+      # Agent-requested MCP tool reference — loaded on-demand when agent needs tool guidance
       def render_mcp_tools_rule
         lines = [
           "---",
-          "description: \"Rails tools (#{tool_count}) — MANDATORY, use before reading any reference files\"",
-          "alwaysApply: true",
+          "description: \"Rails MCP tools reference — #{tool_count} tools for schema, models, routes, controllers, search, testing, and more\"",
+          "alwaysApply: false",
           "---",
           ""
         ]

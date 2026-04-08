@@ -64,12 +64,12 @@ RSpec.describe RailsAiContext::Serializers::CursorRulesSerializer do
     end
   end
 
-  it "generates MCP tools rule with alwaysApply" do
+  it "generates MCP tools rule as agent-requested (alwaysApply false)" do
     Dir.mktmpdir do |dir|
       described_class.new(context).call(dir)
 
       tools_rule = File.read(File.join(dir, ".cursor", "rules", "rails-mcp-tools.mdc"))
-      expect(tools_rule).to include("alwaysApply: true")
+      expect(tools_rule).to include("alwaysApply: false")
       expect(tools_rule).to include("Tools (#{RailsAiContext::Server::TOOLS.size})")
       expect(tools_rule).to include("rails_get_schema")
       expect(tools_rule).to include("Step-by-step workflows")

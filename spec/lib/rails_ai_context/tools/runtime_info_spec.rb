@@ -63,6 +63,38 @@ RSpec.describe RailsAiContext::Tools::RuntimeInfo do
       expect(text).to include("not loaded")
     end
 
+    context "when ActiveRecord is not defined" do
+      before do
+        @original_ar = ActiveRecord
+        hide_const("ActiveRecord")
+      end
+
+      after do
+        # ActiveRecord is restored automatically by hide_const
+      end
+
+      it "degrades gracefully for connection pool section" do
+        result = described_class.call(section: "connections")
+        text = result.content.first[:text]
+        expect(text).to include("ActiveRecord not available")
+        expect(text).not_to include("Pool size")
+      end
+
+      it "degrades gracefully for database section" do
+        result = described_class.call(section: "database")
+        text = result.content.first[:text]
+        expect(text).to include("ActiveRecord not available")
+      end
+
+      it "still returns cache and jobs sections" do
+        result = described_class.call
+        text = result.content.first[:text]
+        expect(text).to include("Runtime Info")
+        expect(text).to include("Cache")
+        expect(text).to include("Background Jobs")
+      end
+    end
+
     it "has read-only annotations" do
       annotations = described_class.annotations_value
       expect(annotations.read_only_hint).to eq(true)

@@ -47,7 +47,7 @@ rails ai:context
 This creates:
 1. `config/initializers/rails_ai_context.rb` — configuration file
 2. `.rails-ai-context.yml` — standalone config (enables switching later)
-3. `.mcp.json` — MCP auto-discovery for Claude Code and Cursor
+3. Per-tool MCP config files — auto-discovery for Claude Code, Cursor, Copilot, OpenCode, and Codex
 4. Context files — tailored for each AI assistant
 
 ### Option B: Standalone (no Gemfile entry needed)
@@ -60,16 +60,16 @@ rails-ai-context init
 
 This creates:
 1. `.rails-ai-context.yml` — configuration file
-2. `.mcp.json` — MCP auto-discovery (if MCP mode selected)
+2. Per-tool MCP config files — auto-discovery (if MCP mode selected)
 3. Context files — tailored for each AI assistant
 
 No Gemfile entry, no initializer, no files in your project besides config and context.
 
 ### What the install generator does
 
-1. Creates `.mcp.json` in project root (MCP auto-discovery)
+1. Creates per-tool MCP config files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `opencode.json`, `.codex/config.toml`)
 2. Creates `config/initializers/rails_ai_context.rb` with commented defaults
-3. Asks which AI tools you use (Claude, Cursor, Copilot, OpenCode)
+3. Asks which AI tools you use (Claude, Cursor, Copilot, OpenCode, Codex)
 4. Asks whether to enable MCP server (`tool_mode: :mcp`) or use CLI-only mode (`tool_mode: :cli`)
 5. Adds `.ai-context.json` to `.gitignore` (JSON cache — markdown files should be committed)
 6. Generates all context files
@@ -159,7 +159,7 @@ end
 | `.cursor/rules/rails-project.mdc` | Project overview | `alwaysApply: true` — loaded in every conversation. |
 | `.cursor/rules/rails-models.mdc` | Model reference | `globs: app/models/**/*.rb` — auto-attaches when editing models. |
 | `.cursor/rules/rails-controllers.mdc` | Controller reference | `globs: app/controllers/**/*.rb` — auto-attaches when editing controllers. |
-| `.cursor/rules/rails-mcp-tools.mdc` | MCP tool reference | `alwaysApply: true` — always available. |
+| `.cursor/rules/rails-mcp-tools.mdc` | MCP tool reference | `alwaysApply: false` — agent-requested when relevant. |
 
 ### GitHub Copilot (5 files)
 
@@ -193,6 +193,7 @@ Commit **all files except `.ai-context.json`** (which is gitignored). This gives
 | `rails ai:context:full` | full | all | Generate all files in full mode |
 | `rails ai:context:claude` | compact | Claude | CLAUDE.md + .claude/rules/ |
 | `rails ai:context:opencode` | compact | OpenCode | AGENTS.md + per-directory AGENTS.md |
+| `rails ai:context:codex` | compact | Codex | AGENTS.md + .codex/config.toml |
 | `rails ai:context:cursor` | compact | Cursor | .cursor/rules/ |
 | `rails ai:context:copilot` | compact | Copilot | copilot-instructions.md + .github/instructions/ |
 | `rails ai:context:json` | — | JSON | .ai-context.json |
@@ -212,7 +213,7 @@ Commit **all files except `.ai-context.json`** (which is gitignored). This gives
 
 | Command | Transport | Description |
 |---------|-----------|-------------|
-| `rails ai:serve` | stdio | Start MCP server for Claude Code / Cursor. Auto-discovered via `.mcp.json`. |
+| `rails ai:serve` | stdio | Start MCP server. Auto-discovered by each AI tool via its own config file. |
 | `rails ai:serve_http` | HTTP | Start MCP server at `http://127.0.0.1:6029/mcp`. For remote clients. |
 
 ### Utilities
@@ -228,7 +229,7 @@ Commit **all files except `.ai-context.json`** (which is gitignored). This gives
 The gem ships a `rails-ai-context` executable that works **without adding the gem to your Gemfile**. Install globally with `gem install rails-ai-context`, then run from any Rails app directory.
 
 ```bash
-rails-ai-context init                      # Interactive setup (creates .rails-ai-context.yml + .mcp.json)
+rails-ai-context init                      # Interactive setup (creates .rails-ai-context.yml + MCP configs)
 rails-ai-context serve                     # Start MCP server (stdio)
 rails-ai-context serve --transport http    # Start MCP server (HTTP, port 6029)
 rails-ai-context serve --transport http --port 8080  # Custom port
@@ -1036,9 +1037,19 @@ curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=rails-ai-cont
 
 ### Auto-discovery (recommended)
 
-The install generator (or `rails-ai-context init`) creates `.mcp.json` in your project root:
+The install generator (or `rails-ai-context init`) creates per-tool MCP config files based on your selected AI tools:
 
-**In-Gemfile:**
+| AI Tool | Config File | Root Key | Format |
+|---------|------------|----------|--------|
+| Claude Code | `.mcp.json` | `mcpServers` | JSON |
+| Cursor | `.cursor/mcp.json` | `mcpServers` | JSON |
+| GitHub Copilot | `.vscode/mcp.json` | `servers` | JSON |
+| OpenCode | `opencode.json` | `mcp` | JSON |
+| Codex CLI | `.codex/config.toml` | `[mcp_servers]` | TOML |
+
+Each file is merge-safe — only the `rails-ai-context` entry is managed, other servers are preserved.
+
+**Example: `.mcp.json` (Claude Code)**
 ```json
 {
   "mcpServers": {
@@ -1050,19 +1061,20 @@ The install generator (or `rails-ai-context init`) creates `.mcp.json` in your p
 }
 ```
 
-**Standalone:**
-```json
-{
-  "mcpServers": {
-    "rails-ai-context": {
-      "command": "rails-ai-context",
-      "args": ["serve"]
-    }
-  }
-}
+**Example: `.codex/config.toml` (Codex CLI)**
+```toml
+[mcp_servers.rails-ai-context]
+command = "bundle"
+args = ["exec", "rails", "ai:serve"]
+
+[mcp_servers.rails-ai-context.env]
+PATH = "/home/user/.rbenv/shims:/usr/local/bin:/usr/bin"
+GEM_HOME = "/home/user/.rbenv/versions/3.3.0/lib/ruby/gems/3.3.0"
 ```
 
-**Claude Code** and **Cursor** auto-detect this file. No manual config needed — just open your project.
+> **Why the `[env]` section?** Codex CLI `env_clear()`s the process before spawning MCP servers, stripping Ruby version manager paths. The install generator snapshots your current Ruby environment (PATH, GEM\_HOME, GEM\_PATH, GEM\_ROOT, RUBY\_VERSION, BUNDLE\_PATH) so the MCP server can find gems regardless of version manager (rbenv, rvm, asdf, mise, chruby, or system Ruby).
+
+Each AI tool auto-detects its own config file. No manual config needed — just open your project.
 
 ### Claude Code
 
@@ -1096,7 +1108,7 @@ Or for standalone: replace `"command": "bundle"` / `"args": ["exec", "rails", "a
 
 ### Cursor
 
-Auto-discovered via `.mcp.json`. Or add manually in **Cursor Settings > MCP**:
+Auto-discovered via `.cursor/mcp.json`. Or add manually in **Cursor Settings > MCP**:
 
 ```json
 {
@@ -1282,7 +1294,7 @@ end
 | `custom_tools` | Array | `[]` | Additional MCP tool classes to register alongside built-in tools |
 | `skip_tools` | Array | `[]` | Built-in tool names to exclude (e.g. `%w[rails_security_scan]`) |
 | `tool_mode` | Symbol | `:mcp` | `:mcp` (MCP primary + CLI fallback) or `:cli` (CLI only, no MCP server needed) |
-| `ai_tools` | Array | `nil` (all) | AI tools to generate context for: `%i[claude cursor copilot opencode]`. Selected during install. |
+| `ai_tools` | Array | `nil` (all) | AI tools to generate context for: `%i[claude cursor copilot opencode codex]`. Selected during install. |
 | `excluded_models` | Array | internal Rails models | Models to skip |
 | `excluded_paths` | Array | `node_modules tmp log vendor .git` | Paths excluded from code search |
 | `sensitive_patterns` | Array | `.env`, `.key`, `.pem`, credentials | File patterns blocked from search and read tools |
@@ -1408,13 +1420,13 @@ config.introspectors = %i[schema models routes gems auth api]
 
 **Context files loaded:**
 - `CLAUDE.md` — read at conversation start
-- `.claude/rules/*.md` — auto-loaded alongside CLAUDE.md
+- `.claude/rules/*.md` — auto-loaded alongside CLAUDE.md (schema, models, and components rules use `paths:` frontmatter for conditional loading)
 
 **MCP tools:** Available immediately via `.mcp.json`.
 
 ### Cursor
 
-**Auto-discovery:** Opens `.mcp.json` automatically. No setup needed.
+**Auto-discovery:** Opens `.cursor/mcp.json` automatically. No setup needed.
 
 **Context files loaded:**
 - `.cursor/rules/*.mdc` — loaded based on `alwaysApply` and `globs` settings
@@ -1422,13 +1434,13 @@ config.introspectors = %i[schema models routes gems auth api]
 **MDC rule activation modes:**
 | Mode | When it activates |
 |------|-------------------|
-| `alwaysApply: true` | Every conversation (project overview, MCP tools) |
+| `alwaysApply: true` | Every conversation (project overview) |
 | `globs: ["app/models/**/*.rb"]` | When editing files matching the glob pattern |
-| `alwaysApply: false` + `description` | When the AI decides it's relevant based on description |
+| `alwaysApply: false` + `description` | Agent-requested — loaded when AI decides it's relevant (MCP tools rule) |
 
 ### OpenCode
 
-**MCP config:** Add to `opencode.json`:
+**Auto-discovery:** `opencode.json` is auto-generated by the install generator. Or add manually:
 
 ```json
 {
@@ -1462,13 +1474,15 @@ For standalone: use `"command": ["rails-ai-context", "serve"]` instead.
 
 OpenCode uses **per-directory lazy-loading**: when the agent reads a file, it walks up the directory tree and auto-loads any `AGENTS.md` it finds. This is how split rules work — no globs or frontmatter needed.
 
-**MCP tools:** Available via `opencode.json` config above.
+**MCP tools:** Available via `opencode.json` (auto-generated or manual config above).
 
 ### GitHub Copilot
 
+**Auto-discovery:** `.vscode/mcp.json` is auto-generated by the install generator.
+
 **Context files loaded:**
 - `.github/copilot-instructions.md` — repo-wide instructions
-- `.github/instructions/*.instructions.md` — path-specific, activated by `applyTo` glob
+- `.github/instructions/*.instructions.md` — path-specific, activated by `applyTo` glob (with `name:` and `description:` frontmatter)
 
 **applyTo patterns:**
 | Pattern | When it activates |
@@ -1476,6 +1490,17 @@ OpenCode uses **per-directory lazy-loading**: when the agent reads a file, it wa
 | `app/models/**/*.rb` | Editing model files |
 | `app/controllers/**/*.rb` | Editing controller files |
 | `**/*` | All files (MCP tool reference) |
+
+### Codex CLI
+
+**Auto-discovery:** `.codex/config.toml` is auto-generated by the install generator, including an `[env]` subsection that snapshots your Ruby environment for sandbox compatibility.
+
+**Context files loaded:**
+- `AGENTS.md` — project overview + MCP tool guide (shared with OpenCode)
+- `app/models/AGENTS.md` — model listing, auto-loaded when agent reads model files
+- `app/controllers/AGENTS.md` — controller listing, auto-loaded when agent reads controller files
+
+**MCP tools:** Available via `.codex/config.toml`.
 
 ---
 
@@ -1628,11 +1653,12 @@ Works in:
 
 ## Troubleshooting
 
-### MCP server not detected by Claude Code / Cursor
+### MCP server not detected by your AI tool
 
-1. Check `.mcp.json` exists in project root
-2. Verify it contains `"command": "bundle"` and `"args": ["exec", "rails", "ai:serve"]`
-3. Restart Claude Code / Cursor
+1. Run `rails ai:doctor` — it checks per-tool MCP config files
+2. Verify the correct config file exists for your tool (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `opencode.json`, `.codex/config.toml`)
+3. Re-run install (`rails generate rails_ai_context:install` or `rails-ai-context init`) to regenerate configs
+4. Restart your AI tool
 
 ### Context files are too large
 

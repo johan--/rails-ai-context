@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] — 2026-04-08
+
+### Added — Universal MCP Auto-Discovery & Per-Tool Context Optimization (#51-#56)
+
+Every AI tool now gets its own MCP config file — auto-detected on project open. No manual setup needed for any supported tool.
+
+- **McpConfigGenerator** (`lib/rails_ai_context/mcp_config_generator.rb`) — Shared infrastructure for per-tool MCP config generation. Writes `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), `.vscode/mcp.json` (GitHub Copilot), `opencode.json` (OpenCode), `.codex/config.toml` (Codex CLI). Merge-safe — only manages the `rails-ai-context` entry, preserves other servers. Supports standalone mode and CLI skip.
+
+- **Codex CLI support** (#51) — 5th supported AI tool. Reuses `AGENTS.md` (shared with OpenCode) and `OpencodeRulesSerializer` for directory-level split rules. Config via `.codex/config.toml` (TOML format) with `[mcp_servers.rails-ai-context.env]` subsection that snapshots Ruby environment variables at install time — required because Codex CLI `env_clear()`s the process before spawning MCP servers. Works with all Ruby version managers (rbenv, rvm, asdf, mise, chruby, system). Added to all 3 install paths (generator, CLI, rake), doctor checks, and search exclusions.
+
+- **Cursor improvements** (#52) — `.cursor/mcp.json` auto-generated for MCP auto-discovery. MCP tools rule changed from `alwaysApply: true` to `alwaysApply: false` with descriptive text for agent-requested (Type 3) loading.
+
+- **OpenCode improvements** (#53) — `opencode.json` auto-generated for MCP auto-discovery.
+
+- **Claude Code improvements** (#54) — `paths:` YAML frontmatter added to `.claude/rules/` schema, models, and components rules for conditional loading. Context and mcp-tools rules remain unconditional.
+
+- **Copilot improvements** (#55) — `.vscode/mcp.json` auto-generated for MCP auto-discovery. `name:` and `description:` YAML frontmatter added to all `.github/instructions/` files. Updated `excludeAgent` spec to validate `code-review`, `coding-agent`, and `workspace` per GitHub Copilot docs.
+
+- **All 3 install paths updated** — Install generator, standalone CLI (`rails-ai-context init`), and rake task (`rails ai:setup`) all delegate to McpConfigGenerator. Codex added as option "5" in interactive tool selection.
+
+- **Doctor expanded** — `check_mcp_json` now validates per-tool MCP configs based on configured `ai_tools` (JSON parse validation + TOML existence check).
+
+- **Search exclusions** — `.codex/`, `.vscode/mcp.json`, `opencode.json` added to `search_code` tool exclusions.
+
 ## [5.4.0] — 2026-04-08
 
 ### Added — Phase 3: Dynamic VFS & Live Resource Architecture (Ground Truth Engine Blueprint #39)

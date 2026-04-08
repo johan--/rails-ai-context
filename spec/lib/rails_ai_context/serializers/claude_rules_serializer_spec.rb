@@ -76,4 +76,41 @@ RSpec.describe RailsAiContext::Serializers::ClaudeRulesSerializer do
       expect(result[:written].size).to eq(3) # context + schema + mcp-tools
     end
   end
+
+  describe "paths: frontmatter" do
+    it "includes paths: frontmatter on schema rule" do
+      Dir.mktmpdir do |dir|
+        described_class.new(context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-schema.md"))
+        expect(content).to start_with("---")
+        expect(content).to include('- "db/schema.rb"')
+        expect(content).to include('- "db/migrate/**"')
+      end
+    end
+
+    it "includes paths: frontmatter on models rule" do
+      Dir.mktmpdir do |dir|
+        described_class.new(context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-models.md"))
+        expect(content).to start_with("---")
+        expect(content).to include('- "app/models/**/*.rb"')
+      end
+    end
+
+    it "does NOT include paths: frontmatter on context rule" do
+      Dir.mktmpdir do |dir|
+        described_class.new(context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-context.md"))
+        expect(content).not_to start_with("---")
+      end
+    end
+
+    it "does NOT include paths: frontmatter on mcp-tools rule" do
+      Dir.mktmpdir do |dir|
+        described_class.new(context).call(dir)
+        content = File.read(File.join(dir, ".claude", "rules", "rails-mcp-tools.md"))
+        expect(content).not_to start_with("---")
+      end
+    end
+  end
 end
