@@ -391,20 +391,15 @@ RSpec.describe RailsAiContext::Tools::Query do
       end
     end
 
-    it "installs and cleans up progress handler for timeout enforcement" do
-      conn = ActiveRecord::Base.connection
-      raw = conn.raw_connection
+    it "executes queries successfully without progress handler support" do
+      raw = ActiveRecord::Base.connection.raw_connection
 
-      if raw.respond_to?(:set_progress_handler)
-        # The tool should install a progress handler for timeout and clean it up
-        described_class.call(sql: "SELECT 1 AS test")
-
-        # After execution, the progress handler should be cleared (no lingering handler)
-        # Verify by running a normal query — should succeed without interruption
-        expect { conn.execute("SELECT 1") }.not_to raise_error
-      else
-        skip "SQLite driver does not support set_progress_handler"
-      end
+      # sqlite3 gem 2.x removed set_progress_handler; verify the timeout
+      # enforcement path degrades gracefully (query still runs, no error)
+      expect(raw.respond_to?(:set_progress_handler)).to be false
+      response = described_class.call(sql: "SELECT 1 AS test")
+      expect(response).to be_a(MCP::Tool::Response)
+      expect(response.content.first[:text]).to include("test")
     end
 
     it "resets PRAGMA query_only after query execution" do
