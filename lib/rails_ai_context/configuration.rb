@@ -156,7 +156,7 @@ module RailsAiContext
     attr_accessor :skip_tools
 
     # Which AI tools to generate context for (selected during install)
-    # nil = all formats, or %i[claude cursor copilot opencode]
+    # nil = all formats, or %i[claude cursor copilot opencode codex]
     attr_accessor :ai_tools
 
     # Tool invocation mode: :mcp (MCP primary + CLI fallback) or :cli (CLI only)

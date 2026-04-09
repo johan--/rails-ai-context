@@ -9,8 +9,8 @@ require "yaml"
 # - Root file: .github/copilot-instructions.md — NO YAML frontmatter, plain markdown
 # - Path-specific: .github/instructions/*.instructions.md — MUST have applyTo frontmatter
 # - Supported frontmatter fields: applyTo (required), excludeAgent, name, description
-# - excludeAgent values: "code-review" or "coding-agent"
-# - Copilot Code Review: 4,000 character hard limit per instruction file
+# - excludeAgent values: "code-review", "coding-agent", or "workspace"
+# - Copilot Code Review: ~1,000 lines soft recommendation per instruction file
 # - Glob patterns: **/* (all), app/models/**/*.rb, *.{js,ts} — standard glob syntax
 # - No order guarantee between matching instruction files
 # - Subdirectory organization allowed in .github/instructions/
@@ -143,8 +143,21 @@ RSpec.describe "Copilot instructions compliance" do
         end
       end
 
+      it "all instruction files have name and description" do
+        generated_files.each do |filename, file|
+          fm = parse_frontmatter(file[:content])
+          next unless fm.is_a?(Hash)
+          expect(fm).to have_key("name"),
+            "#{filename} missing name frontmatter field"
+          expect(fm["name"]).to be_a(String)
+          expect(fm).to have_key("description"),
+            "#{filename} missing description frontmatter field"
+          expect(fm["description"]).to be_a(String)
+        end
+      end
+
       it "excludeAgent uses valid values when present" do
-        valid_values = %w[code-review coding-agent]
+        valid_values = %w[code-review coding-agent workspace]
         generated_files.each do |filename, file|
           fm = parse_frontmatter(file[:content])
           next unless fm.is_a?(Hash) && fm.key?("excludeAgent")

@@ -64,4 +64,371 @@ RSpec.describe RailsAiContext::Doctor do
       expect(preset).not_to be_nil
     end
   end
+
+  describe "#check_codex_env_staleness" do
+    subject(:check) { doctor.send(:check_codex_env_staleness) }
+
+    let(:toml_path) { File.join(Rails.application.root, ".codex/config.toml") }
+
+    context "when codex is not in ai_tools" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude cursor])
+      end
+
+      it "returns nil (skipped)" do
+        expect(check).to be_nil
+      end
+    end
+
+    context "when codex is in ai_tools" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude codex])
+      end
+
+      context "when .codex/config.toml does not exist" do
+        before do
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(false)
+        end
+
+        it "returns nil (skipped)" do
+          expect(check).to be_nil
+        end
+      end
+
+      context "when .codex/config.toml exists but has no env section" do
+        before do
+          toml_content = <<~TOML
+            [mcp_servers.rails-ai-context]
+            command = "bundle"
+            args = ["exec", "rails", "ai:serve"]
+          TOML
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(true)
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(toml_path).and_return(toml_content)
+        end
+
+        it "returns nil (skipped)" do
+          expect(check).to be_nil
+        end
+      end
+
+      context "when env section exists but has no GEM_HOME" do
+        before do
+          toml_content = <<~TOML
+            [mcp_servers.rails-ai-context]
+            command = "bundle"
+            args = ["exec", "rails", "ai:serve"]
+
+            [mcp_servers.rails-ai-context.env]
+            PATH = "/usr/local/bin:/usr/bin"
+          TOML
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(true)
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(toml_path).and_return(toml_content)
+        end
+
+        it "returns nil (skipped)" do
+          expect(check).to be_nil
+        end
+      end
+
+      context "when GEM_HOME directory exists on disk" do
+        let(:gem_home) { Dir.mktmpdir("gem_home_test") }
+
+        after { FileUtils.rm_rf(gem_home) }
+
+        before do
+          toml_content = <<~TOML
+            [mcp_servers.rails-ai-context]
+            command = "bundle"
+            args = ["exec", "rails", "ai:serve"]
+
+            [mcp_servers.rails-ai-context.env]
+            GEM_HOME = "#{gem_home}"
+            PATH = "/usr/local/bin:/usr/bin"
+          TOML
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(true)
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(toml_path).and_return(toml_content)
+        end
+
+        it "returns a pass check" do
+          expect(check.status).to eq(:pass)
+          expect(check.name).to eq("Codex env snapshot")
+          expect(check.message).to include(gem_home)
+        end
+      end
+
+      context "when GEM_HOME directory no longer exists" do
+        let(:stale_gem_home) { "/nonexistent/path/to/gems/3.3.0" }
+
+        before do
+          toml_content = <<~TOML
+            [mcp_servers.rails-ai-context]
+            command = "bundle"
+            args = ["exec", "rails", "ai:serve"]
+
+            [mcp_servers.rails-ai-context.env]
+            GEM_HOME = "#{stale_gem_home}"
+            PATH = "/usr/local/bin:/usr/bin"
+          TOML
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(true)
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(toml_path).and_return(toml_content)
+        end
+
+        it "returns a warn check with stale GEM_HOME path" do
+          expect(check.status).to eq(:warn)
+          expect(check.name).to eq("Codex env snapshot")
+          expect(check.message).to include("stale")
+          expect(check.message).to include(stale_gem_home)
+          expect(check.fix).to include("install")
+        end
+      end
+
+      context "when env section is followed by another TOML section" do
+        let(:gem_home) { Dir.mktmpdir("gem_home_boundary") }
+
+        after { FileUtils.rm_rf(gem_home) }
+
+        before do
+          toml_content = <<~TOML
+            [mcp_servers.rails-ai-context]
+            command = "bundle"
+            args = ["exec", "rails", "ai:serve"]
+
+            [mcp_servers.rails-ai-context.env]
+            GEM_HOME = "#{gem_home}"
+
+            [mcp_servers.other-tool]
+            command = "other"
+          TOML
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(toml_path).and_return(true)
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(toml_path).and_return(toml_content)
+        end
+
+        it "correctly parses the env section and returns pass" do
+          expect(check.status).to eq(:pass)
+          expect(check.message).to include(gem_home)
+        end
+      end
+    end
+  end
+
+  describe "#check_mcp_json" do
+    subject(:check) { doctor.send(:check_mcp_json) }
+
+    let(:root) { Rails.application.root }
+
+    context "when tool_mode is :cli" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:tool_mode).and_return(:cli)
+      end
+
+      it "returns pass with skip message" do
+        expect(check.status).to eq(:pass)
+        expect(check.message).to include("CLI-only")
+      end
+    end
+
+    context "when multiple tools configured, some configs missing" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:tool_mode).and_return(:mcp)
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude cursor copilot])
+        # .mcp.json exists and is valid
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(File.join(root, ".mcp.json")).and_return(true)
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(File.join(root, ".mcp.json")).and_return('{"mcpServers":{}}')
+        # .cursor/mcp.json missing
+        allow(File).to receive(:exist?).with(File.join(root, ".cursor/mcp.json")).and_return(false)
+        # .vscode/mcp.json missing
+        allow(File).to receive(:exist?).with(File.join(root, ".vscode/mcp.json")).and_return(false)
+      end
+
+      it "aggregates all failures into a single check" do
+        expect(check.status).to eq(:warn)
+        expect(check.message).to include("2 of 3")
+        expect(check.message).to include(".cursor/mcp.json")
+        expect(check.message).to include(".vscode/mcp.json")
+      end
+    end
+
+    context "when all configs present and valid" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:tool_mode).and_return(:mcp)
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude opencode])
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(File.join(root, ".mcp.json")).and_return(true)
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(File.join(root, ".mcp.json")).and_return('{"mcpServers":{}}')
+        allow(File).to receive(:exist?).with(File.join(root, "opencode.json")).and_return(true)
+        allow(File).to receive(:read).with(File.join(root, "opencode.json")).and_return('{"mcp":{}}')
+      end
+
+      it "returns pass with count" do
+        expect(check.status).to eq(:pass)
+        expect(check.message).to include("2 of 2")
+      end
+    end
+
+    context "when no tools configured (defaults to all)" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:tool_mode).and_return(:mcp)
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(nil)
+        # Stub all 5 config files as present
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:read).and_call_original
+        %w[.mcp.json .cursor/mcp.json .vscode/mcp.json opencode.json].each do |path|
+          allow(File).to receive(:exist?).with(File.join(root, path)).and_return(true)
+          allow(File).to receive(:read).with(File.join(root, path)).and_return("{}")
+        end
+        allow(File).to receive(:exist?).with(File.join(root, ".codex/config.toml")).and_return(true)
+      end
+
+      it "checks all 5 tools and returns pass" do
+        expect(check.status).to eq(:pass)
+        expect(check.message).to include("5 of 5")
+      end
+    end
+
+    context "when a JSON config has invalid JSON" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:tool_mode).and_return(:mcp)
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude])
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(File.join(root, ".mcp.json")).and_return(true)
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(File.join(root, ".mcp.json")).and_return("not json{{{")
+      end
+
+      it "returns fail status with tool label" do
+        expect(check.status).to eq(:fail)
+        expect(check.message).to include("1 of 1")
+        expect(check.message).to include(".mcp.json")
+      end
+    end
+  end
+
+  describe "#check_context_freshness" do
+    subject(:check) { doctor.send(:check_context_freshness) }
+
+    let(:app) { Rails.application }
+
+    context "when cursor-only (split rules only, no root file)" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[cursor])
+        allow(File).to receive(:exist?).and_call_original
+        allow(Dir).to receive(:exist?).and_call_original
+
+        cursor_rules_path = File.join(app.root, ".cursor/rules")
+        # No root file, but split rule directory exists
+        allow(File).to receive(:exist?).with(cursor_rules_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(cursor_rules_path).and_return(true)
+        allow(File).to receive(:directory?).and_call_original
+        allow(File).to receive(:directory?).with(cursor_rules_path).and_return(true)
+
+        # Mock split rule files with recent mtime
+        rule_files = [ File.join(cursor_rules_path, "rails-context.mdc") ]
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob).with(File.join(cursor_rules_path, "**/*")).and_return(rule_files)
+        allow(File).to receive(:mtime).and_call_original
+        allow(File).to receive(:mtime).with(rule_files.first).and_return(Time.now)
+
+        # No stale source dirs
+        %w[app/models app/controllers app/views config db/migrate].each do |dir|
+          allow(Dir).to receive(:exist?).with(File.join(app.root, dir)).and_return(false)
+        end
+      end
+
+      it "detects .cursor/rules as valid context" do
+        expect(check.status).to eq(:pass)
+        expect(check.message).to include(".cursor/rules")
+      end
+    end
+
+    context "when multi-tool configured with existing files" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude copilot])
+        allow(File).to receive(:exist?).and_call_original
+        allow(Dir).to receive(:exist?).and_call_original
+
+        claude_path = File.join(app.root, "CLAUDE.md")
+        allow(File).to receive(:exist?).with(claude_path).and_return(true)
+        allow(File).to receive(:directory?).and_call_original
+        allow(File).to receive(:directory?).with(claude_path).and_return(false)
+        allow(File).to receive(:mtime).and_call_original
+        allow(File).to receive(:mtime).with(claude_path).and_return(Time.now)
+
+        %w[app/models app/controllers app/views config db/migrate].each do |dir|
+          allow(Dir).to receive(:exist?).with(File.join(app.root, dir)).and_return(false)
+        end
+      end
+
+      it "checks the first available file (CLAUDE.md)" do
+        expect(check.status).to eq(:pass)
+        expect(check.message).to include("CLAUDE.md")
+      end
+    end
+
+    context "when no context files exist" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude cursor])
+        allow(File).to receive(:exist?).and_call_original
+        allow(Dir).to receive(:exist?).and_call_original
+
+        allow(File).to receive(:exist?).with(File.join(app.root, "CLAUDE.md")).and_return(false)
+        allow(Dir).to receive(:exist?).with(File.join(app.root, "CLAUDE.md")).and_return(false)
+        allow(File).to receive(:exist?).with(File.join(app.root, ".cursor/rules")).and_return(false)
+        allow(Dir).to receive(:exist?).with(File.join(app.root, ".cursor/rules")).and_return(false)
+      end
+
+      it "returns warn with 'no context files generated'" do
+        expect(check.status).to eq(:warn)
+        expect(check.message).to include("No context files generated")
+      end
+    end
+
+    context "when context file is stale" do
+      before do
+        allow(RailsAiContext.configuration).to receive(:ai_tools).and_return(%i[claude])
+        allow(File).to receive(:exist?).and_call_original
+        allow(Dir).to receive(:exist?).and_call_original
+
+        claude_path = File.join(app.root, "CLAUDE.md")
+        allow(File).to receive(:exist?).with(claude_path).and_return(true)
+        allow(File).to receive(:directory?).and_call_original
+        allow(File).to receive(:directory?).with(claude_path).and_return(false)
+        # Context generated 1 hour ago
+        allow(File).to receive(:mtime).and_call_original
+        allow(File).to receive(:mtime).with(claude_path).and_return(Time.now - 3600)
+
+        # app/models exists and has a file newer than context
+        models_dir = File.join(app.root, "app/models")
+        allow(Dir).to receive(:exist?).with(models_dir).and_return(true)
+        model_file = File.join(models_dir, "user.rb")
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob).with(File.join(models_dir, "**/*.rb")).and_return([ model_file ])
+        allow(File).to receive(:mtime).with(model_file).and_return(Time.now)
+
+        # Other dirs don't exist
+        %w[app/controllers app/views config db/migrate].each do |dir|
+          allow(Dir).to receive(:exist?).with(File.join(app.root, dir)).and_return(false)
+        end
+      end
+
+      it "returns warn with stale message" do
+        expect(check.status).to eq(:warn)
+        expect(check.message).to include("stale")
+        expect(check.message).to include("app/models")
+      end
+    end
+  end
 end

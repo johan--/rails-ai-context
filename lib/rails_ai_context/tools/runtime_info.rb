@@ -55,6 +55,8 @@ module RailsAiContext
         # ── Connection pool ──────────────────────────────────────────────
 
         def gather_connection_pool
+          return [ "## Connection Pool", "", "_ActiveRecord not available._", "" ] unless defined?(ActiveRecord::Base)
+
           stat = ActiveRecord::Base.connection_pool.stat
           lines = [ "## Connection Pool", "" ]
           lines << "| Metric | Value |"
@@ -79,6 +81,8 @@ module RailsAiContext
         # ── Database section ─────────────────────────────────────────────
 
         def gather_database(detail) # rubocop:disable Metrics
+          return [ "## Database", "", "_ActiveRecord not available._", "" ] unless defined?(ActiveRecord::Base)
+
           conn = ActiveRecord::Base.connection
           adapter = conn.adapter_name.downcase
           lines = [ "## Database", "" ]

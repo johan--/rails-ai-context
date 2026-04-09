@@ -18,6 +18,7 @@ module RailsAiContext
       check_migrations
       check_context_freshness
       check_mcp_json
+      check_codex_env_staleness
       check_mcp_buildable
       check_introspector_health
       check_preset_coverage
@@ -49,6 +50,13 @@ module RailsAiContext
     end
 
     private
+
+    # All configured AI tools, defaulting to all 5 when nil (unconfigured).
+    ALL_AI_TOOLS = %i[claude cursor copilot opencode codex].freeze
+
+    def configured_ai_tools
+      RailsAiContext.configuration.ai_tools || ALL_AI_TOOLS
+    end
 
     # ── Existence checks ──────────────────────────────────────────────
 
@@ -160,45 +168,158 @@ module RailsAiContext
 
     # ── Context file checks ───────────────────────────────────────────
 
+    # Per-tool context paths — root files or split rule directories.
+    # Some tools (cursor) produce only split rules, no root file.
+    CONTEXT_FILES = {
+      claude:   "CLAUDE.md",
+      cursor:   ".cursor/rules",
+      opencode: "AGENTS.md",
+      codex:    "AGENTS.md",
+      copilot:  ".github/copilot-instructions.md"
+    }.freeze
+
     def check_context_freshness
-      claude_path = File.join(app.root, "CLAUDE.md")
-      unless File.exist?(claude_path)
+      ai_tools = configured_ai_tools
+
+      # Find the first existing context file or split rule directory for configured tools
+      context_file = nil
+      context_label = nil
+      ai_tools.each do |tool|
+        filename = CONTEXT_FILES[tool]
+        next unless filename
+
+        path = File.join(app.root, filename)
+        if File.exist?(path) || Dir.exist?(path)
+          context_file = path
+          context_label = filename
+          break
+        end
+      end
+
+      unless context_file
         return Check.new(name: "Context files", status: :warn,
           message: "No context files generated",
           fix: "Run `rails ai:context`")
       end
 
-      generated_at = File.mtime(claude_path)
-      # Check if any source file changed after context was generated
+      generated_at = if File.directory?(context_file)
+        # Split rule directories: use the most recent file's mtime
+        Dir.glob(File.join(context_file, "**/*"))
+          .reject { |f| File.directory?(f) }
+          .map { |f| File.mtime(f) }
+          .max || Time.at(0)
+      else
+        File.mtime(context_file)
+      end
+      # Check if any source file changed after context was generated.
+      # Exclude our own initializer — it's written during install and would
+      # always appear newer than context files generated in the same run.
       stale_dirs = %w[app/models app/controllers app/views config db/migrate].select do |dir|
         full = File.join(app.root, dir)
-        Dir.exist?(full) && Dir.glob(File.join(full, "**/*.rb")).any? { |f| File.mtime(f) > generated_at }
+        Dir.exist?(full) && Dir.glob(File.join(full, "**/*.rb"))
+          .reject { |f| f.end_with?("initializers/rails_ai_context.rb") }
+          .any? { |f| File.mtime(f) > generated_at }
       end
 
       if stale_dirs.empty?
-        Check.new(name: "Context files", status: :pass, message: "CLAUDE.md is up to date", fix: nil)
+        Check.new(name: "Context files", status: :pass, message: "#{context_label} is up to date", fix: nil)
       else
         Check.new(name: "Context files", status: :warn,
-          message: "CLAUDE.md may be stale — #{stale_dirs.join(', ')} changed since last generation",
+          message: "#{context_label} may be stale — #{stale_dirs.join(', ')} changed since last generation",
           fix: "Run `rails ai:context` to regenerate")
       end
     end
 
     def check_mcp_json
-      mcp_path = File.join(app.root, ".mcp.json")
-      unless File.exist?(mcp_path)
-        return Check.new(name: ".mcp.json", status: :warn,
-          message: "No .mcp.json for MCP auto-discovery",
-          fix: "Run `rails generate rails_ai_context:install`")
+      if RailsAiContext.configuration.tool_mode == :cli
+        return Check.new(name: "MCP configs", status: :pass,
+          message: "Skipped (CLI-only mode)", fix: nil)
       end
 
-      begin
-        JSON.parse(File.read(mcp_path))
-        Check.new(name: ".mcp.json", status: :pass, message: ".mcp.json valid", fix: nil)
-      rescue JSON::ParserError => e
-        Check.new(name: ".mcp.json", status: :fail,
-          message: ".mcp.json has invalid JSON: #{e.message}",
-          fix: "Run `rails generate rails_ai_context:install` to regenerate")
+      ai_tools = configured_ai_tools
+      configs = {
+        claude:   { path: ".mcp.json",         label: ".mcp.json (Claude Code)" },
+        cursor:   { path: ".cursor/mcp.json",  label: ".cursor/mcp.json (Cursor)" },
+        copilot:  { path: ".vscode/mcp.json",  label: ".vscode/mcp.json (VS Code/Copilot)" },
+        opencode: { path: "opencode.json",     label: "opencode.json (OpenCode)" },
+        codex:    { path: ".codex/config.toml", label: ".codex/config.toml (Codex CLI)" }
+      }
+
+      # Check at least the Claude Code config (always expected)
+      tools_to_check = ai_tools & configs.keys
+      tools_to_check = %i[claude] if tools_to_check.empty?
+
+      checks = tools_to_check.map do |tool|
+        cfg = configs[tool]
+        full_path = File.join(app.root, cfg[:path])
+        unless File.exist?(full_path)
+          next Check.new(name: cfg[:label], status: :warn,
+            message: "No #{cfg[:path]} for MCP auto-discovery",
+            fix: "Run `rails generate rails_ai_context:install`")
+        end
+
+        if cfg[:path].end_with?(".toml")
+          Check.new(name: cfg[:label], status: :pass, message: "#{cfg[:path]} exists", fix: nil)
+        else
+          begin
+            JSON.parse(File.read(full_path))
+            Check.new(name: cfg[:label], status: :pass, message: "#{cfg[:path]} valid", fix: nil)
+          rescue JSON::ParserError => e
+            Check.new(name: cfg[:label], status: :fail,
+              message: "#{cfg[:path]} has invalid JSON: #{e.message}",
+              fix: "Run `rails generate rails_ai_context:install` to regenerate")
+          end
+        end
+      end
+
+      # Aggregate all results into a single summary check
+      failures = checks.select { |c| c.status != :pass }
+
+      if failures.empty?
+        Check.new(name: "MCP configs", status: :pass,
+          message: "#{checks.size} of #{checks.size} MCP config(s) valid",
+          fix: nil)
+      else
+        labels = failures.map { |c| c.name }
+        worst_status = failures.any? { |c| c.status == :fail } ? :fail : :warn
+        Check.new(name: "MCP configs", status: worst_status,
+          message: "#{failures.size} of #{checks.size} MCP config(s) need attention: #{labels.join(', ')}",
+          fix: "Run `rails generate rails_ai_context:install` to fix")
+      end
+    end
+
+    def check_codex_env_staleness
+      return nil if RailsAiContext.configuration.tool_mode == :cli
+
+      ai_tools = configured_ai_tools
+      return nil unless ai_tools.include?(:codex)
+
+      toml_path = File.join(app.root, ".codex/config.toml")
+      return nil unless File.exist?(toml_path)
+
+      content = File.read(toml_path)
+      match = content.match(/^\[mcp_servers\.rails-ai-context\.env\]\s*$(.+?)(?=\n\[|\z)/m)
+      return nil unless match
+
+      env_section = match[1]
+
+      # Check if snapshotted GEM_HOME directory still exists on disk.
+      # This is version-manager agnostic and OS agnostic — no string format
+      # assumptions. If the directory was removed (e.g. Ruby upgrade), the
+      # env snapshot is definitely stale.
+      gem_home_match = env_section.match(/^GEM_HOME\s*=\s*"([^"]+)"/)
+      return nil unless gem_home_match
+
+      snapshot_gem_home = gem_home_match[1]
+
+      if Dir.exist?(snapshot_gem_home)
+        Check.new(name: "Codex env snapshot", status: :pass,
+          message: "Codex GEM_HOME (#{snapshot_gem_home}) exists — env snapshot is current",
+          fix: nil)
+      else
+        Check.new(name: "Codex env snapshot", status: :warn,
+          message: "Codex MCP env snapshot is stale — GEM_HOME #{snapshot_gem_home} no longer exists. Re-run the install generator to update.",
+          fix: "Run `rails generate rails_ai_context:install` or `rails-ai-context init`")
       end
     end
 

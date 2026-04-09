@@ -135,13 +135,25 @@ RSpec.describe "Cursor MDC compliance" do
     end
 
     it "always-apply rules have alwaysApply: true" do
-      %w[rails-project.mdc rails-mcp-tools.mdc].each do |filename|
+      %w[rails-project.mdc].each do |filename|
         file = generated_files[filename]
         next unless file
         fm = parse_frontmatter(file[:content])
         expect(fm["alwaysApply"]).to be(true),
           "#{filename} should be alwaysApply: true"
       end
+    end
+
+    it "mcp-tools rule is agent-requested (Type 3)" do
+      file = generated_files["rails-mcp-tools.mdc"]
+      expect(file).not_to be_nil
+      fm = parse_frontmatter(file[:content])
+      expect(fm["alwaysApply"]).to be(false),
+        "rails-mcp-tools.mdc should be alwaysApply: false (agent-requested)"
+      expect(fm["description"]).to be_a(String)
+      expect(fm["description"]).to include("tools")
+      expect(fm).not_to have_key("globs"),
+        "agent-requested rules should not have globs"
     end
 
     it "auto-attached rules have alwaysApply: false" do

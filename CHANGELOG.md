@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.6.0] — 2026-04-09
+
+### Added — Auto-Registration, TestHelper & Bug Fixes
+
+Developer experience improvements inspired by action_mcp patterns, plus 5 security/correctness bug fixes.
+
+- **Auto-registration via `inherited` hook** — Tools are now auto-discovered from `BaseTool` subclasses. No manual list to maintain — drop a file in `tools/` and it's registered. `Server.builtin_tools` is the new public API. Thread-safe via `@registry_mutex` with deadlock-free design (const_get runs outside mutex to avoid recursive locking from inherited). `Server::TOOLS` preserved as deprecated `const_missing` shim for backwards compatibility.
+
+- **`abstract!` pattern** — `BaseTool.abstract!` excludes a class from the registry. `BaseTool` itself is abstract. Subclasses are concrete by default.
+
+- **TestHelper module** (`lib/rails_ai_context/test_helper.rb`) — Reusable test helper for custom_tools users. Methods: `execute_tool` (by name, short name, or class), `execute_tool_with_error`, `assert_tool_findable`, `assert_tool_response_includes`, `assert_tool_response_excludes`, `extract_response_text`. Works with both RSpec and Minitest. Supports fuzzy name resolution (`schema` → `rails_get_schema`).
+
+### Fixed
+
+- **SQL comment stripping validation bypass** (HIGH) — `#` comment stripping now restricted to line-start only, preventing validation bypass via hash characters in string literals. PostgreSQL JSONB operators (`#>>`) preserved.
+
+- **SHARED_CACHE read outside mutex** (MEDIUM) — `redact_results` now uses `cached_context` for thread-safe access to encrypted column data.
+
+- **McpController double-checked locking** (MEDIUM) — Removed unsynchronized read outside mutex, fixing unsafe pattern on non-GVL Rubies (JRuby/TruffleRuby).
+
+- **PG EXPLAIN parser bare rescue** (LOW) — Changed from `rescue` to `rescue JSON::ParserError`, preventing silent swallowing of bugs in `extract_pg_nodes`.
+
+- **GetConcern `class_methods` block closing** (LOW) — Indent-based tracking to detect the closing `end`, so `def self.` methods after the block are no longer lost.
+
+- **Query spec graceful degradation** — Replaced permanently-pending spec (sqlite3 2.x removed `set_progress_handler`) with a spec that verifies queries execute correctly without it.
+
+## [5.5.0] — 2026-04-08
+
+### Added — Universal MCP Auto-Discovery & Per-Tool Context Optimization (#51-#56)
+
+Every AI tool now gets its own MCP config file — auto-detected on project open. No manual setup needed for any supported tool.
+
+- **McpConfigGenerator** (`lib/rails_ai_context/mcp_config_generator.rb`) — Shared infrastructure for per-tool MCP config generation. Writes `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), `.vscode/mcp.json` (GitHub Copilot), `opencode.json` (OpenCode), `.codex/config.toml` (Codex CLI). Merge-safe — only manages the `rails-ai-context` entry, preserves other servers. Supports standalone mode and CLI skip.
+
+- **Codex CLI support** (#51) — 5th supported AI tool. Reuses `AGENTS.md` (shared with OpenCode) and `OpencodeRulesSerializer` for directory-level split rules. Config via `.codex/config.toml` (TOML format) with `[mcp_servers.rails-ai-context.env]` subsection that snapshots Ruby environment variables at install time — required because Codex CLI `env_clear()`s the process before spawning MCP servers. Works with all Ruby version managers (rbenv, rvm, asdf, mise, chruby, system). Added to all 3 install paths (generator, CLI, rake), doctor checks, and search exclusions.
+
+- **Cursor improvements** (#52) — `.cursor/mcp.json` auto-generated for MCP auto-discovery. MCP tools rule changed from `alwaysApply: true` to `alwaysApply: false` with descriptive text for agent-requested (Type 3) loading.
+
+- **OpenCode improvements** (#53) — `opencode.json` auto-generated for MCP auto-discovery.
+
+- **Claude Code improvements** (#54) — `paths:` YAML frontmatter added to `.claude/rules/` schema, models, and components rules for conditional loading. Context and mcp-tools rules remain unconditional.
+
+- **Copilot improvements** (#55) — `.vscode/mcp.json` auto-generated for MCP auto-discovery. `name:` and `description:` YAML frontmatter added to all `.github/instructions/` files. Updated `excludeAgent` spec to validate `code-review`, `coding-agent`, and `workspace` per GitHub Copilot docs.
+
+- **All 3 install paths updated** — Install generator, standalone CLI (`rails-ai-context init`), and rake task (`rails ai:setup`) all delegate to McpConfigGenerator. Codex added as option "5" in interactive tool selection.
+
+- **Doctor expanded** — `check_mcp_json` now validates per-tool MCP configs based on configured `ai_tools` (JSON parse validation + TOML existence check).
+
+- **Search exclusions** — `.codex/`, `.vscode/mcp.json`, `opencode.json` added to `search_code` tool exclusions.
+
 ## [5.4.0] — 2026-04-08
 
 ### Added — Phase 3: Dynamic VFS & Live Resource Architecture (Ground Truth Engine Blueprint #39)

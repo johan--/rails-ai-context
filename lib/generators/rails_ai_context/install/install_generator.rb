@@ -13,15 +13,19 @@ module RailsAiContext
         "1" => { key: :claude,   name: "Claude Code",     files: "CLAUDE.md + .claude/rules/",                        format: :claude },
         "2" => { key: :cursor,   name: "Cursor",          files: ".cursor/rules/",                                     format: :cursor },
         "3" => { key: :copilot,  name: "GitHub Copilot",  files: ".github/copilot-instructions.md + .github/instructions/", format: :copilot },
-        "4" => { key: :opencode, name: "OpenCode",        files: "AGENTS.md",                                          format: :opencode }
+        "4" => { key: :opencode, name: "OpenCode",        files: "AGENTS.md",                                          format: :opencode },
+        "5" => { key: :codex,   name: "Codex CLI",       files: "AGENTS.md + .codex/config.toml",                     format: :codex }
       }.freeze
 
-      # Files/dirs generated per AI tool format — used for cleanup on tool removal
+      # Files/dirs generated per AI tool format — used for cleanup on tool removal.
+      # MCP config files are NOT listed here — they use merge-safe removal via
+      # McpConfigGenerator.remove to preserve other servers' entries.
       FORMAT_PATHS = {
         claude:   %w[CLAUDE.md .claude/rules],
         cursor:   %w[.cursor/rules],
         copilot:  %w[.github/copilot-instructions.md .github/instructions],
-        opencode: %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md]
+        opencode: %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md],
+        codex:    %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md]
       }.freeze
 
       def select_ai_tools
@@ -86,10 +90,17 @@ module RailsAiContext
 
         return if to_remove.empty?
 
+        # Collect paths still needed by remaining tools to avoid deleting shared files
+        kept_paths = @selected_formats.flat_map { |f| FORMAT_PATHS[f] || [] }.to_set
+
         to_remove.each do |fmt|
           tool = AI_TOOLS.values.find { |t| t[:format] == fmt }
+
+          # Remove context files (skip if another selected tool still needs them)
           paths = FORMAT_PATHS[fmt] || []
           paths.each do |rel_path|
+            next if kept_paths.include?(rel_path)
+
             full = Rails.root.join(rel_path)
             if File.directory?(full)
               FileUtils.rm_rf(full)
@@ -99,6 +110,11 @@ module RailsAiContext
               say "  Removed #{rel_path}", :red
             end
           end
+
+          # Merge-safe MCP config cleanup — removes only the rails-ai-context entry
+          cleaned = RailsAiContext::McpConfigGenerator.remove(tools: [ fmt ], output_dir: Rails.root.to_s)
+          cleaned.each { |f| say "  Removed MCP entry from #{Pathname.new(f).relative_path_from(Rails.root)}", :red }
+
           say "  ✓ #{tool[:name]} files removed", :green if tool
         end
       end
@@ -107,7 +123,7 @@ module RailsAiContext
         say ""
         say "Do you also want MCP server support?", :yellow
         say ""
-        say "  1. Yes — MCP primary + CLI fallback (generates .mcp.json)"
+        say "  1. Yes — MCP primary + CLI fallback (generates per-tool MCP config files)"
         say "  2. No  — CLI only (no server needed)"
         say ""
 
@@ -123,34 +139,23 @@ module RailsAiContext
       end
 
       def create_mcp_config
-        # Skip .mcp.json for CLI-only mode
-        if @tool_mode == :cli
-          say "Skipped .mcp.json (CLI-only mode)", :yellow
-          return
+        generator = RailsAiContext::McpConfigGenerator.new(
+          tools: @selected_formats,
+          output_dir: Rails.root.to_s,
+          standalone: false,
+          tool_mode: @tool_mode
+        )
+        result = generator.call
+        result[:written].each do |f|
+          rel = Pathname.new(f).relative_path_from(Rails.root)
+          say "Created/Updated #{rel}", :green
         end
-        mcp_path = Rails.root.join(".mcp.json")
-        server_entry = {
-          "command" => "bundle",
-          "args" => [ "exec", "rails", "ai:serve" ]
-        }
-
-        if File.exist?(mcp_path)
-          existing = JSON.parse(File.read(mcp_path)) rescue {}
-          existing["mcpServers"] ||= {}
-
-          if existing["mcpServers"]["rails-ai-context"] == server_entry
-            say ".mcp.json already up to date — skipped", :yellow
-          else
-            existing["mcpServers"]["rails-ai-context"] = server_entry
-            File.write(mcp_path, JSON.pretty_generate(existing) + "\n")
-            verb = existing["mcpServers"].key?("rails-ai-context") ? "Updated" : "Added"
-            say "#{verb} rails-ai-context in .mcp.json", :green
-          end
-        else
-          create_file ".mcp.json", JSON.pretty_generate({
-            mcpServers: { "rails-ai-context" => server_entry }
-          }) + "\n"
-          say "Created .mcp.json (auto-discovered by Claude Code, Cursor, etc.)", :green
+        result[:skipped].each do |f|
+          rel = Pathname.new(f).relative_path_from(Rails.root)
+          say "#{rel} unchanged — skipped", :yellow
+        end
+        if @tool_mode == :cli
+          say "Skipped MCP config files (CLI-only mode)", :yellow
         end
       end
 
@@ -162,7 +167,7 @@ module RailsAiContext
             # ── AI Tools ──────────────────────────────────────────────────────
             # Which AI tools to generate context files for (selected during install)
             # Run `rails generate rails_ai_context:install` to change selection
-            # config.ai_tools = %i[claude cursor copilot opencode]  # default: all
+            # config.ai_tools = %i[claude cursor copilot opencode codex]  # default: all
 
             # Tool invocation mode:
             #   :mcp — MCP primary + CLI fallback (default, requires `rails ai:serve`)
@@ -236,7 +241,7 @@ module RailsAiContext
         SECTION
         "Extensibility" => <<~SECTION,
             # ── Extensibility ─────────────────────────────────────────────────
-            # Register additional MCP tool classes alongside the #{RailsAiContext::Server::TOOLS.size} built-in tools
+            # Register additional MCP tool classes alongside the #{RailsAiContext::Server.builtin_tools.size} built-in tools
             # config.custom_tools = [MyApp::CustomTool]
 
             # Exclude specific built-in tools by name
@@ -515,7 +520,7 @@ module RailsAiContext
         say ""
         say "Commands:", :yellow
         say "  rails ai:context         # Regenerate context files"
-        tool_count = RailsAiContext::Server::TOOLS.size
+        tool_count = RailsAiContext::Server.builtin_tools.size
         say "  rails 'ai:tool[schema]'    # Run any of the #{tool_count} tools from CLI"
         if @tool_mode == :mcp
           say "  rails ai:serve           # Start MCP server (#{tool_count} live tools)"
@@ -525,8 +530,8 @@ module RailsAiContext
         say ""
         if @tool_mode == :mcp
           say "MCP auto-discovery:", :yellow
-          say "  .mcp.json is auto-detected by Claude Code and Cursor."
-          say "  No manual config needed — just open your project."
+          say "  Each AI tool gets its own config file — auto-detected on project open."
+          say "  No manual config needed."
         else
           say "CLI tools:", :yellow
           say "  AI agents can run `rails 'ai:tool[schema]' table=users` directly."
@@ -543,7 +548,7 @@ module RailsAiContext
         say "  rails-ai-context init          # interactive setup"
         say "  rails-ai-context serve         # start MCP server"
         say ""
-        say "Commit context files and .mcp.json so your team benefits!", :green
+        say "Commit context files and MCP config files so your team benefits!", :green
       end
     end
   end

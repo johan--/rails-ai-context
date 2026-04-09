@@ -16,8 +16,8 @@ Gem::Specification.new do |spec|
     associations, routes, inherited filters, conventions, and test patterns.
     Semantic validation catches cross-file errors (wrong columns, missing partials,
     broken routes) before code runs — so AI writes correct code on the first try.
-    Auto-generates context files for Claude Code, Cursor, GitHub Copilot, and
-    OpenCode. Works standalone or in-Gemfile.
+    Auto-generates context files for Claude Code, Cursor, GitHub Copilot,
+    OpenCode, and Codex CLI. Works standalone or in-Gemfile.
   DESC
 
   spec.homepage      = "https://github.com/crisnahine/rails-ai-context"

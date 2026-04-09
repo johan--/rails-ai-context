@@ -73,8 +73,28 @@ RSpec.describe RailsAiContext::Serializers::ContextFileSerializer do
         allow(RailsAiContext.configuration).to receive(:output_dir_for).and_return(dir)
         serializer = described_class.new(context, format: :opencode)
         result = serializer.call
-        agents_file = result[:written].find { |f| f.end_with?("AGENTS.md") }
+        agents_file = result[:written].find { |f| f.end_with?("AGENTS.md") && !f.include?("app/") }
         expect(agents_file).not_to be_nil
+      end
+    end
+
+    it "generates AGENTS.md when writing codex format" do
+      Dir.mktmpdir do |dir|
+        allow(RailsAiContext.configuration).to receive(:output_dir_for).and_return(dir)
+        serializer = described_class.new(context, format: :codex)
+        result = serializer.call
+        agents_file = result[:written].find { |f| f.end_with?("AGENTS.md") && !f.include?("app/") }
+        expect(agents_file).not_to be_nil
+      end
+    end
+
+    it "does not write AGENTS.md twice when both opencode and codex are selected" do
+      Dir.mktmpdir do |dir|
+        allow(RailsAiContext.configuration).to receive(:output_dir_for).and_return(dir)
+        serializer = described_class.new(context, format: :all)
+        result = serializer.call
+        root_agents = result[:written].select { |f| File.basename(f) == "AGENTS.md" && !f.include?("app/") }
+        expect(root_agents.size).to eq(1)
       end
     end
 

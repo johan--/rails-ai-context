@@ -61,7 +61,7 @@ module RailsAiContext
           > Generated: #{context[:generated_at]}
           > Rails #{context[:rails_version]} | Ruby #{context[:ruby_version]}
 
-          This file gives AI assistants (Claude Code, Cursor, Copilot) deep context
+          This file gives AI assistants (Claude Code, Cursor, Copilot, OpenCode, Codex) deep context
           about this Rails application's structure, patterns, and conventions.
         MD
       end

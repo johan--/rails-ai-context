@@ -9,6 +9,7 @@
 <a href="https://cursor.com"><img src="https://img.shields.io/badge/Cursor-000000?style=for-the-badge&logo=cursor&logoColor=white" alt="Cursor"></a>
 <a href="https://github.com/features/copilot"><img src="https://img.shields.io/badge/GitHub_Copilot-000000?style=for-the-badge&logo=githubcopilot&logoColor=white" alt="GitHub Copilot"></a>
 <a href="https://opencode.ai"><img src="https://img.shields.io/badge/OpenCode-4285F4?style=for-the-badge&logoColor=white" alt="OpenCode"></a>
+<a href="https://codex.openai.com"><img src="https://img.shields.io/badge/Codex_CLI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="Codex CLI"></a>
 <a href="#-cli--works-everywhere"><img src="https://img.shields.io/badge/Any_Terminal-4EAA25?style=for-the-badge&logo=gnubash&logoColor=white" alt="Any Terminal"></a>
 
 
@@ -20,7 +21,7 @@
 <br>
 [![Ruby](https://img.shields.io/badge/Ruby-3.2%20%7C%203.3%20%7C%203.4-CC342D)](https://github.com/crisnahine/rails-ai-context)
 [![Rails](https://img.shields.io/badge/Rails-7.1%20%7C%207.2%20%7C%208.0-CC0000)](https://github.com/crisnahine/rails-ai-context)
-[![Tests](https://img.shields.io/badge/Tests-1813%20passing-brightgreen)](https://github.com/crisnahine/rails-ai-context/actions)
+[![Tests](https://img.shields.io/badge/Tests-1889%20passing-brightgreen)](https://github.com/crisnahine/rails-ai-context/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
@@ -131,7 +132,7 @@ Compare what AI outputs with and without these tools wired in. The difference is
 
 ### MCP Server (stdio)
 
-AI calls tools directly via the protocol. Auto-discovered through `.mcp.json`.
+AI calls tools directly via the protocol. Each AI tool gets its own config file — auto-detected on project open.
 
 ```
 rails ai:serve
@@ -438,7 +439,7 @@ cd your-rails-app
 rails-ai-context init
 ```
 
-Both paths ask which AI tools you use and whether you want MCP or CLI mode. `.mcp.json` is auto-detected by Claude Code and Cursor.
+Both paths ask which AI tools you use (Claude Code, Cursor, GitHub Copilot, OpenCode, Codex CLI) and whether you want MCP or CLI mode. Each tool gets its own MCP config file — auto-detected on project open.
 
 <br>
 
@@ -518,7 +519,7 @@ Events: `rails_ai_context.tools.call`, `rails_ai_context.resources.read`, and mo
 ## About
 
 Built by a Rails developer with 10+ years of production experience.<br>
-1813 tests. 38 tools. 5 resource templates. 31 introspectors. Standalone or in-Gemfile.<br>
+1889 tests. 38 tools. 5 resource templates. 31 introspectors. Standalone or in-Gemfile.<br>
 MIT licensed. [Contributions welcome.](CONTRIBUTING.md)
 
 <br>

@@ -391,20 +391,15 @@ RSpec.describe RailsAiContext::Tools::Query do
       end
     end
 
-    it "installs and cleans up progress handler for timeout enforcement" do
-      conn = ActiveRecord::Base.connection
-      raw = conn.raw_connection
+    it "executes queries successfully without progress handler support" do
+      raw = ActiveRecord::Base.connection.raw_connection
 
-      if raw.respond_to?(:set_progress_handler)
-        # The tool should install a progress handler for timeout and clean it up
-        described_class.call(sql: "SELECT 1 AS test")
-
-        # After execution, the progress handler should be cleared (no lingering handler)
-        # Verify by running a normal query — should succeed without interruption
-        expect { conn.execute("SELECT 1") }.not_to raise_error
-      else
-        skip "SQLite driver does not support set_progress_handler"
-      end
+      # sqlite3 gem 2.x removed set_progress_handler; verify the timeout
+      # enforcement path degrades gracefully (query still runs, no error)
+      expect(raw.respond_to?(:set_progress_handler)).to be false
+      response = described_class.call(sql: "SELECT 1 AS test")
+      expect(response).to be_a(MCP::Tool::Response)
+      expect(response.content.first[:text]).to include("test")
     end
 
     it "resets PRAGMA query_only after query execution" do
@@ -441,8 +436,28 @@ RSpec.describe RailsAiContext::Tools::Query do
       expect(described_class.strip_sql_comments(sql)).to eq("SELECT 1")
     end
 
-    it "strips MySQL-style hash comments" do
-      expect(described_class.strip_sql_comments("SELECT 1 # evil comment")).to eq("SELECT 1")
+    it "strips MySQL-style hash comments at line start" do
+      expect(described_class.strip_sql_comments("# full line comment\nSELECT 1")).to eq("SELECT 1")
+    end
+
+    it "preserves hash characters inside SQL strings" do
+      sql = "SELECT '#'; DROP TABLE users"
+      result = described_class.strip_sql_comments(sql)
+      expect(result).to include("DROP TABLE")
+    end
+
+    it "preserves PostgreSQL JSONB operators" do
+      sql = "SELECT data #>> '{key}' FROM records"
+      result = described_class.strip_sql_comments(sql)
+      expect(result).to include("#>>")
+    end
+  end
+
+  describe "SQL validation with hash in string literals" do
+    it "blocks destructive SQL hidden after hash in string literal" do
+      valid, error = described_class.validate_sql("SELECT '#'; DROP TABLE users")
+      expect(valid).to be false
+      expect(error).to include("Blocked")
     end
   end
 
