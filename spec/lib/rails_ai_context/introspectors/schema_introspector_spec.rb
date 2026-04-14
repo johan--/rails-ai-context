@@ -19,6 +19,34 @@ RSpec.describe RailsAiContext::Introspectors::SchemaIntrospector do
       end
     end
 
+    context "with an empty schema.rb and no migrations (fresh Rails app)" do
+      before do
+        allow(introspector).to receive(:active_record_connected?).and_return(false)
+
+        db_dir = File.join(fixture_path, "db")
+        FileUtils.mkdir_p(db_dir)
+        File.write(File.join(db_dir, "schema.rb"), <<~RUBY)
+          ActiveRecord::Schema[8.0].define(version: 0) do
+          end
+        RUBY
+      end
+
+      after { FileUtils.rm_rf(File.join(fixture_path, "db")) }
+
+      it "does not report 'file not found' when schema.rb exists but is empty" do
+        result = introspector.call
+        expect(result[:error]).to be_nil
+      end
+
+      it "returns an empty-schema state with total_tables=0 and a helpful note" do
+        result = introspector.call
+        expect(result[:total_tables]).to eq(0)
+        expect(result[:tables]).to eq({})
+        expect(result[:note]).to include("no migrations have been run yet")
+        expect(result[:note]).to include("bin/rails db:migrate")
+      end
+    end
+
     context "with a valid schema.rb fixture" do
       before do
         allow(introspector).to receive(:active_record_connected?).and_return(false)
