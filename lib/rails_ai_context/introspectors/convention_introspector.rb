@@ -119,7 +119,15 @@ module RailsAiContext
 
           Dir.glob(File.join(dir, "**/*.rb")).first(500).any? do |f|
             content = RailsAiContext::SafeFile.read(f) or next false
-            content.match?(ASYNC_QUERY_PATTERN)
+            # Skip lines whose first non-whitespace character is `#` so we don't
+            # match deleted-code comments or TODO references like
+            # `# TODO: use load_async here`. Doesn't strip in-line trailing
+            # comments — Ruby AST parsing would be needed for that, and the
+            # false-positive rate from in-line trailing comments is tiny.
+            content.each_line.any? do |line|
+              next false if line.lstrip.start_with?("#")
+              line.match?(ASYNC_QUERY_PATTERN)
+            end
           end
         end
       rescue => e

@@ -84,22 +84,34 @@ module RailsAiContext
         controllers_dir = File.join(root, "app/controllers")
         return [] unless Dir.exist?(controllers_dir)
 
-        Dir.glob(File.join(controllers_dir, "**/*.rb")).filter_map do |path|
-          content = RailsAiContext::SafeFile.read(path) or next
-          next unless content.match?(/\ballow_unauthenticated_access\b/)
+        Dir.glob(File.join(controllers_dir, "**/*.rb")).flat_map do |path|
+          content = RailsAiContext::SafeFile.read(path) or next []
+          next [] unless content.match?(/\ballow_unauthenticated_access\b/)
 
           relative = path.sub("#{root}/", "")
-          # Try to capture the `only:` or `except:` filter so AI knows scope
-          scope_match = content.match(/allow_unauthenticated_access\s+(only|except):\s*(\[?[^\n]+)/)
-          if scope_match
-            { file: relative, scope: "#{scope_match[1]}: #{scope_match[2].strip}" }
+          # Capture every `only:` / `except:` declaration in the file. A single
+          # controller can have multiple (e.g. `only:` + `except:` mixed via concerns).
+          scoped = content.scan(/allow_unauthenticated_access\s+(only|except):\s*(\[?[^\n]+)/)
+
+          if scoped.empty?
+            [ { file: relative, scope: "all actions" } ]
           else
-            { file: relative, scope: "all actions" }
+            scoped.map do |kw, value|
+              { file: relative, scope: "#{kw}: #{strip_trailing_comment(value).strip}" }
+            end
           end
-        end.sort_by { |h| h[:file] }
+        end.compact.sort_by { |h| h[:file] }
       rescue => e
         $stderr.puts "[rails-ai-context] scan_allow_unauthenticated_access failed: #{e.message}" if ENV["DEBUG"]
         []
+      end
+
+      # Strip a trailing `# comment` from a captured scope value while preserving
+      # `#` characters that appear inside string literals or array element syntax.
+      # Conservative: only strips when the `#` is preceded by whitespace, which
+      # matches the common style (`only: %i[index] # comment`).
+      def strip_trailing_comment(value)
+        value.sub(/\s+#.*\z/, "")
       end
 
       def detect_authorization

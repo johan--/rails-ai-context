@@ -116,6 +116,20 @@ RSpec.describe RailsAiContext::Introspectors::JobIntrospector do
       expect(timers).to include(a_hash_including(method: "sync_state", every: "30.seconds"))
     end
 
+    it "preserves complex intervals like lambdas without truncating them" do
+      complex = <<~RUBY
+        class TickerChannel < ApplicationCable::Channel
+          periodically :broadcast, every: -> { current_user.interval }
+        end
+      RUBY
+      timers = introspector.send(:extract_channel_periodic, complex)
+      expect(timers).to be_an(Array)
+      entry = timers.find { |t| t[:method] == "broadcast" }
+      expect(entry).not_to be_nil
+      expect(entry[:every]).to include("->")
+      expect(entry[:every]).to include("current_user.interval")
+    end
+
     it "returns nil when source has no identified_by" do
       expect(introspector.send(:extract_identified_by, "class Foo; end")).to be_nil
     end
@@ -126,6 +140,33 @@ RSpec.describe RailsAiContext::Introspectors::JobIntrospector do
 
     it "returns nil when source has no periodic timers" do
       expect(introspector.send(:extract_channel_periodic, "class Foo; end")).to be_nil
+    end
+  end
+
+  describe "#extract_channel_actions" do
+    let(:channel_class) do
+      Class.new do
+        def self.instance_methods(include_super = true)
+          %i[subscribed unsubscribed speak ping stream_audio stream_video]
+        end
+      end
+    end
+
+    let(:lifecycle_only_class) do
+      Class.new do
+        def self.instance_methods(include_super = true)
+          %i[subscribed unsubscribed]
+        end
+      end
+    end
+
+    it "returns RPC action methods, excluding lifecycle hooks and stream_* helpers" do
+      actions = introspector.send(:extract_channel_actions, channel_class)
+      expect(actions).to contain_exactly("ping", "speak")
+    end
+
+    it "returns nil when only lifecycle hooks are present" do
+      expect(introspector.send(:extract_channel_actions, lifecycle_only_class)).to be_nil
     end
   end
 end

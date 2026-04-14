@@ -150,6 +150,12 @@ module RailsAiContext
       def extract_channels
         return [] unless defined?(ActionCable::Channel::Base)
 
+        # In development (config.eager_load = false), channel files are not
+        # loaded until a client subscribes. Without this, .descendants is empty
+        # and the entire channels array is missing from the introspector output.
+        # Mirrors the eager_load pattern used by ModelIntrospector / ControllerIntrospector.
+        eager_load_channels!
+
         ActionCable::Channel::Base.descendants.filter_map do |channel|
           next if channel.name.nil? || channel.name == "ApplicationCable::Channel"
 
@@ -170,6 +176,19 @@ module RailsAiContext
       rescue => e
         $stderr.puts "[rails-ai-context] extract_channels failed: #{e.message}" if ENV["DEBUG"]
         []
+      end
+
+      def eager_load_channels!
+        return if Rails.application.config.eager_load
+
+        channels_path = File.join(app.root, "app", "channels")
+        if defined?(Zeitwerk) && Dir.exist?(channels_path) &&
+           Rails.autoloaders.respond_to?(:main) && Rails.autoloaders.main.respond_to?(:eager_load_dir)
+          Rails.autoloaders.main.eager_load_dir(channels_path)
+        end
+      rescue => e
+        $stderr.puts "[rails-ai-context] eager_load_channels! failed: #{e.message}" if ENV["DEBUG"]
+        nil
       end
 
       def channel_source(channel)
@@ -215,10 +234,14 @@ module RailsAiContext
       end
 
       # `periodically :method_name, every: 3.seconds`
+      # The `[^\n]+` capture group is already line-bounded, so we keep the full
+      # captured value (after stripping whitespace). Earlier versions tried to
+      # trim past the first comma/whitespace, which mangled lambdas and
+      # complex intervals like `-> { current_user.interval }`.
       def extract_channel_periodic(source)
         return nil unless source
         timers = source.scan(/\bperiodically\s+:(\w+),\s*every:\s*([^\n]+)/).map do |method_name, interval|
-          { method: method_name, every: interval.strip.sub(/[,\s].*$/, "") }
+          { method: method_name, every: interval.strip }
         end
         timers.any? ? timers : nil
       end

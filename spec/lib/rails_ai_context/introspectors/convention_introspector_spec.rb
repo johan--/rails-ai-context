@@ -110,5 +110,29 @@ RSpec.describe RailsAiContext::Introspectors::ConventionIntrospector do
         expect(result[:patterns]).not_to include("async_queries")
       end
     end
+
+    context "with async query patterns appearing only in comments" do
+      let(:controller_dir)  { File.join(Rails.root, "app/controllers") }
+      let(:controller_path) { File.join(controller_dir, "comment_only_controller.rb") }
+
+      before do
+        FileUtils.mkdir_p(controller_dir)
+        File.write(controller_path, <<~RUBY)
+          class CommentOnlyController < ApplicationController
+            # We used to call User.async_count here but removed it.
+            # TODO: bring back load_async once the perf review lands.
+            def index
+              @users = User.all
+            end
+          end
+        RUBY
+      end
+
+      after { FileUtils.rm_f(controller_path) }
+
+      it "does NOT detect async_queries (comments are not real usage)" do
+        expect(result[:patterns]).not_to include("async_queries")
+      end
+    end
   end
 end
