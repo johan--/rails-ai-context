@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.7.2] — 2026-04-14
+## [5.8.0] — 2026-04-14
+
+### Added — Modern Rails Coverage Pass
+
+Five targeted gaps in modern Rails introspection, identified by an audit of the introspectors against current Rails 7/8 patterns. Net result: the gem now surfaces what AI agents need to know about Rails 8 built-in auth, Solid Errors, async query usage, strong_migrations safety, and Action Cable channel detail.
+
+- **Rails 8 built-in auth depth.** `auth_introspector#detect_authentication` previously detected `bin/rails generate authentication` only as a boolean. Now returns a hash with the Authentication concern path, the Sessions/Passwords controller paths, and a per-controller list of `allow_unauthenticated_access` filters with their `only:`/`except:` scope. Each declaration in a file yields its own entry (a controller with both `only:` and `except:` is captured fully, not collapsed to the first match), and trailing line comments are stripped from the captured scope. AI agents can answer "which controllers are public?" in one tool call.
+- **Solid Errors gem detection.** Added `solid_errors` (Rails 8 database-backed error tracking, by @fractaledmind) to `gem_introspector.rb`'s `NOTABLE_GEMS` map under the `:monitoring` category. Was the only Solid-* gem missing from the list (`solid_queue`, `solid_cache`, `solid_cable` were already covered). `solid_health` is NOT a real published gem — Rails 8 ships a built-in `/up` healthcheck endpoint with no gem needed.
+- **Async query pattern detection.** `convention_introspector#detect_patterns` now adds `async_queries` to the patterns array when it finds `load_async` or any of the `async_count`/`async_sum`/`async_minimum`/`async_maximum`/`async_average`/`async_pluck`/`async_ids`/`async_exists`/`async_find_by`/`async_find`/`async_first`/`async_last`/`async_take` calls in `app/controllers`, `app/services`, `app/jobs`, or `app/models`. Comment-only references (e.g. `# TODO: bring back load_async`) are skipped to avoid false positives. AI agents can recognize the perf optimization is in use without re-scanning.
+- **Strong Migrations integration.** `migration_advisor` now emits a `## Strong Migrations Warnings` section when the `strong_migrations` gem is in `Gemfile.lock`. Catalog covers the most common breaking-change patterns: `remove_column` (needs `safety_assured` + `ignored_columns` first), `rename_column` (unsafe under load, two-step pattern), `change_column` type change (table rewrite), `add_index` without `algorithm: :concurrently` (Postgres write lock), `add_foreign_key` without `validate: false` (lock validation), and `add_column` with `null: false` but no default (table rewrite). Each warning includes the safer pattern. Fires only when the gem is detected — zero noise for projects that don't use it.
+- **Action Cable channel detail.** `job_introspector#extract_channels` was returning `{ name, stream_methods }` only. Enriched to also extract `identified_by` attributes, `stream_from`/`stream_for` targets, `periodically` timers with their full intervals (including lambdas like `every: -> { current_user.interval }`), RPC action methods (excluding subscribed/unsubscribed/stream_*), and the source file path. **`get_job_pattern` now renders an "Action Cable Channels" section with all of these fields**, so AI agents calling the tool actually see the data instead of just the channel name. Also added `eager_load_channels!` to `JobIntrospector` so the channel set is populated in development mode (where `config.eager_load = false` and `ActionCable::Channel::Base.descendants` is otherwise empty until a client subscribes).
+
+### Changed — CI matrix expanded to cover Ruby 4.0 + Rails 8.1
+
+- Added Ruby `4.0` and Rails `8.1` to the GitHub Actions test matrix. Net jobs: 12 (was 8). Excludes the unsupported combinations: Ruby 3.2 × Rails 8.x (Rails 8 needs 3.3+) and Ruby 4.0 × Rails 7.x (Rails 7 has no Ruby 4 support). Verified locally that the full spec suite passes on Ruby 4.0.2 + Rails 8.1.3 (the environment in #69) — 1925 examples, 0 failures, rubocop clean across all 282 source files.
+
+### Fixed — Standalone Install Path Crashed Inside Bundler-Backed Rails Apps
+
+- **`rails-ai-context` installed via `gem install` (standalone path) crashed on every tool call** when run inside a Rails app that has its own `Gemfile`. Root cause: `boot_rails!` in `exe/rails-ai-context` calls `require config/environment.rb` which runs `Bundler.setup`, which strips `Gem.loaded_specs` to only the app's Gemfile-resolved gems. The MCP SDK reads `Gem.loaded_specs["json-schema"].full_gem_path` at tool-call time (`mcp/tool/schema.rb:45`) — but `json-schema` is a transitive dep of `mcp`, not in the app's Gemfile, so the lookup nils and crashes with `NoMethodError: undefined method 'full_gem_path' for nil`.
+- **Fix:** added `restore_standalone_gem_specs` to `exe/rails-ai-context` which re-registers `mcp`, `json-schema`, and a couple of their transitive deps in `Gem.loaded_specs` after `Bundler.setup` runs. No-op in in-Gemfile mode (the specs are already registered). This was a pre-existing bug that was discovered during v5.8.0 pre-release E2E verification — affected v5.4.0 onward.
 
 ### Fixed — MCP Tool Responses Rejected by Strict Clients (#69)
 

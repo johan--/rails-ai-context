@@ -132,5 +132,71 @@ RSpec.describe RailsAiContext::Tools::GetJobPattern do
         expect(text).to include("maintenance")
       end
     end
+
+    context "with channel data in cached context" do
+      let(:channel_payload) do
+        {
+          jobs: [],
+          mailers: [],
+          channels: [
+            {
+              name:           "ChatChannel",
+              file:           "app/channels/chat_channel.rb",
+              identified_by:  %w[current_user tenant],
+              streams:        { stream_from: %w[chat_room_general], stream_for: %w[current_user] },
+              periodic:       [
+                { method: "ping",            every: "3.seconds" },
+                { method: "broadcast_state", every: "-> { current_user.interval }" }
+              ],
+              actions:        %w[speak],
+              stream_methods: %w[subscribed]
+            }
+          ]
+        }
+      end
+
+      before do
+        allow(described_class).to receive(:cached_context).and_return(jobs: channel_payload)
+      end
+
+      it "renders an Action Cable Channels section with all v5.8.0 fields" do
+        result = described_class.call
+        text = result.content.first[:text]
+        expect(text).to include("Action Cable Channels")
+        expect(text).to include("ChatChannel")
+        expect(text).to include("app/channels/chat_channel.rb")
+        expect(text).to include("current_user")
+        expect(text).to include("tenant")
+        expect(text).to include("chat_room_general")
+        expect(text).to include("ping")
+        expect(text).to include("3.seconds")
+        expect(text).to include("broadcast_state")
+        # Lambda interval must be preserved end-to-end through the render path.
+        expect(text).to include("-> { current_user.interval }")
+        expect(text).to include("speak")
+      end
+
+      it "still works when no jobs exist but channels do" do
+        result = described_class.call
+        text = result.content.first[:text]
+        expect(text).not_to include("No app/jobs/ directory found")
+        expect(text).to include("ChatChannel")
+      end
+    end
+
+    context "with no jobs and no channels" do
+      before do
+        allow(described_class).to receive(:cached_context).and_return(jobs: { jobs: [], mailers: [], channels: [] })
+        allow(Dir).to receive(:exist?).and_call_original
+        allow(Dir).to receive(:exist?).with(File.join(Rails.root.to_s, "app", "jobs")).and_return(false)
+      end
+
+      it "returns the no-async-stuff message" do
+        result = described_class.call
+        text = result.content.first[:text]
+        expect(text).to include("No app/jobs/ directory found")
+        expect(text).to include("no Action Cable channels detected")
+      end
+    end
   end
 end

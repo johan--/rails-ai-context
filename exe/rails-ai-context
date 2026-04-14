@@ -414,6 +414,12 @@ class RailsAiContextCLI < Thor
       (result[:skipped] || []).each { |f| $stderr.puts "  Skipped: #{f} (unchanged)" }
     end
 
+    # Gems that the MCP SDK reads from `Gem.loaded_specs` at tool-call time
+    # (specifically `Gem.loaded_specs["json-schema"].full_gem_path` in
+    # mcp/tool/schema.rb). Bundler.setup strips them in standalone mode so we
+    # capture references BEFORE Rails boot runs and re-register them afterwards.
+    STANDALONE_REQUIRED_GEMS = %w[mcp json-schema addressable public_suffix].freeze
+
     def boot_rails!
       config_path = File.join(Dir.pwd, "config", "environment.rb")
       unless File.exist?(config_path)
@@ -426,21 +432,53 @@ class RailsAiContextCLI < Thor
       # Bundler.setup (in config/boot.rb) strips $LOAD_PATH to Gemfile-only gems.
       # In standalone mode (gem not in Gemfile), this removes our gem and mcp paths.
       # We restore them after boot so lazy requires (mcp, etc.) still resolve.
-      #
-      # We do NOT require mcp or rails_ai_context before boot — that would activate
-      # gem versions that conflict with Bundler's resolution (e.g., bigdecimal).
-      # Instead, paths are restored and gems load lazily using Bundler-resolved deps.
       pre_boot_paths = $LOAD_PATH.dup
+
+      # Capture spec references BEFORE Bundler.setup runs. After Bundler.setup,
+      # Gem::Specification.find_by_name is filtered to only Gemfile-resolved gems
+      # and our transitive deps (mcp, json-schema) become invisible — find_by_name
+      # raises Gem::MissingSpecError. Capturing first means we hold real spec
+      # objects we can splice back in after boot. No-op in in-Gemfile mode (the
+      # captured specs already exist in Gem.loaded_specs and our `||=` skips them).
+      pre_boot_specs = capture_standalone_specs
 
       require config_path
 
-      # Restore paths that Bundler.setup stripped (standalone mode).
-      # For Gemfile users, this is a no-op — no paths were removed.
+      # Restore paths and specs that Bundler.setup stripped (standalone mode).
+      # For Gemfile users, both restorations are no-ops.
       (pre_boot_paths - $LOAD_PATH).each { |p| $LOAD_PATH << p }
+      pre_boot_specs.each { |name, spec| Gem.loaded_specs[name] ||= spec }
+
+      # Loud warning if any required spec couldn't be restored — silent failure
+      # here means tools will crash later with `undefined method 'full_gem_path'
+      # for nil` from inside the MCP SDK.
+      missing = STANDALONE_REQUIRED_GEMS.reject { |g| Gem.loaded_specs.key?(g) }
+      if missing.any? && !ENV["BUNDLE_BIN_PATH"]
+        $stderr.puts "[rails-ai-context] WARNING: standalone CLI could not restore gemspec(s): #{missing.join(', ')}."
+        $stderr.puts "[rails-ai-context]   Tool calls may crash with `undefined method 'full_gem_path' for nil`."
+        $stderr.puts "[rails-ai-context]   Try `gem install rails-ai-context` to ensure all transitive deps are installed."
+      end
 
       require "rails_ai_context"
 
       RailsAiContext::Configuration.auto_load!
+    end
+
+    # Look up each required gem via Gem::Specification.find_by_name BEFORE
+    # Bundler.setup runs and filters the spec registry. Returns a hash of
+    # {gem_name => Gem::Specification}. In in-Gemfile mode the lookups still
+    # succeed but the result is unused (Bundler keeps these specs registered).
+    def capture_standalone_specs
+      return {} unless defined?(Gem) && Gem.respond_to?(:loaded_specs)
+
+      STANDALONE_REQUIRED_GEMS.each_with_object({}) do |gem_name, acc|
+        spec = Gem::Specification.find_by_name(gem_name)
+        acc[gem_name] = spec if spec
+      rescue Gem::MissingSpecError, Gem::LoadError
+        # The gem is not installed at all (not just Bundler-filtered). Skip
+        # silently — the downstream `require` produces a clearer error.
+        next
+      end
     end
 end
 

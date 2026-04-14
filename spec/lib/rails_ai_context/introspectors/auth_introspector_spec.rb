@@ -248,5 +248,131 @@ RSpec.describe RailsAiContext::Introspectors::AuthIntrospector do
         end
       end
     end
+
+    describe "Rails 8 built-in auth depth" do
+      let(:session_model)         { File.join(Rails.root, "app/models/session.rb") }
+      let(:current_model)         { File.join(Rails.root, "app/models/current.rb") }
+      let(:auth_concern)          { File.join(Rails.root, "app/controllers/concerns/authentication.rb") }
+      let(:sessions_controller)   { File.join(Rails.root, "app/controllers/sessions_controller.rb") }
+      let(:passwords_controller)  { File.join(Rails.root, "app/controllers/passwords_controller.rb") }
+      let(:public_controller)     { File.join(Rails.root, "app/controllers/public_controller.rb") }
+
+      before do
+        FileUtils.mkdir_p(File.dirname(auth_concern))
+        File.write(session_model, "class Session < ApplicationRecord; end")
+        File.write(current_model, "class Current < ActiveSupport::CurrentAttributes; end")
+        File.write(auth_concern, "module Authentication; extend ActiveSupport::Concern; end")
+        File.write(sessions_controller, "class SessionsController < ApplicationController; end")
+        File.write(passwords_controller, "class PasswordsController < ApplicationController; end")
+        File.write(public_controller, <<~RUBY)
+          class PublicController < ApplicationController
+            allow_unauthenticated_access only: %i[index show]
+          end
+        RUBY
+      end
+
+      after do
+        [ session_model, current_model, auth_concern, sessions_controller, passwords_controller, public_controller ].each do |f|
+          FileUtils.rm_f(f)
+        end
+      end
+
+      it "detects Rails 8 auth as a hash with full depth" do
+        rails_auth = result[:authentication][:rails_auth]
+        expect(rails_auth).to be_a(Hash)
+        expect(rails_auth[:detected]).to eq(true)
+        expect(rails_auth[:authentication_concern]).to eq("app/controllers/concerns/authentication.rb")
+        expect(rails_auth[:sessions_controller]).to eq("app/controllers/sessions_controller.rb")
+        expect(rails_auth[:passwords_controller]).to eq("app/controllers/passwords_controller.rb")
+      end
+
+      it "lists controllers with allow_unauthenticated_access including scope" do
+        unauth = result[:authentication][:rails_auth][:allow_unauthenticated_access]
+        expect(unauth).to be_an(Array)
+        public_entry = unauth.find { |h| h[:file] == "app/controllers/public_controller.rb" }
+        expect(public_entry).not_to be_nil
+        expect(public_entry[:scope]).to include("only:")
+        expect(public_entry[:scope]).to include("index")
+      end
+    end
+
+    describe "Rails 8 auth — edge cases for allow_unauthenticated_access" do
+      let(:session_model)  { File.join(Rails.root, "app/models/session.rb") }
+      let(:current_model)  { File.join(Rails.root, "app/models/current.rb") }
+      let(:multi_ctrl)     { File.join(Rails.root, "app/controllers/multi_controller.rb") }
+      let(:except_ctrl)    { File.join(Rails.root, "app/controllers/except_controller.rb") }
+      let(:bare_ctrl)      { File.join(Rails.root, "app/controllers/bare_controller.rb") }
+      let(:commented_ctrl) { File.join(Rails.root, "app/controllers/commented_controller.rb") }
+
+      before do
+        File.write(session_model, "class Session < ApplicationRecord; end")
+        File.write(current_model, "class Current < ActiveSupport::CurrentAttributes; end")
+
+        File.write(multi_ctrl, <<~RUBY)
+          class MultiController < ApplicationController
+            allow_unauthenticated_access only: %i[index]
+            allow_unauthenticated_access except: %i[destroy]
+          end
+        RUBY
+
+        File.write(except_ctrl, <<~RUBY)
+          class ExceptController < ApplicationController
+            allow_unauthenticated_access except: %i[secret_action]
+          end
+        RUBY
+
+        File.write(bare_ctrl, <<~RUBY)
+          class BareController < ApplicationController
+            allow_unauthenticated_access
+          end
+        RUBY
+
+        File.write(commented_ctrl, <<~RUBY)
+          class CommentedController < ApplicationController
+            allow_unauthenticated_access only: %i[index] # legacy public action
+          end
+        RUBY
+      end
+
+      after do
+        [ session_model, current_model, multi_ctrl, except_ctrl, bare_ctrl, commented_ctrl ].each do |f|
+          FileUtils.rm_f(f)
+        end
+      end
+
+      it "yields ONE entry per allow_unauthenticated_access declaration in the same file" do
+        unauth  = result[:authentication][:rails_auth][:allow_unauthenticated_access]
+        entries = unauth.select { |h| h[:file] == "app/controllers/multi_controller.rb" }
+        expect(entries.size).to eq(2)
+        expect(entries.map { |h| h[:scope] }).to include(
+          a_string_starting_with("only:"),
+          a_string_starting_with("except:")
+        )
+      end
+
+      it "captures the except: scope" do
+        unauth = result[:authentication][:rails_auth][:allow_unauthenticated_access]
+        entry  = unauth.find { |h| h[:file] == "app/controllers/except_controller.rb" }
+        expect(entry).not_to be_nil
+        expect(entry[:scope]).to start_with("except:")
+        expect(entry[:scope]).to include("secret_action")
+      end
+
+      it "uses 'all actions' fallback when no scope is given" do
+        unauth = result[:authentication][:rails_auth][:allow_unauthenticated_access]
+        entry  = unauth.find { |h| h[:file] == "app/controllers/bare_controller.rb" }
+        expect(entry).not_to be_nil
+        expect(entry[:scope]).to eq("all actions")
+      end
+
+      it "strips trailing line comments from the captured scope" do
+        unauth = result[:authentication][:rails_auth][:allow_unauthenticated_access]
+        entry  = unauth.find { |h| h[:file] == "app/controllers/commented_controller.rb" }
+        expect(entry).not_to be_nil
+        expect(entry[:scope]).not_to include("legacy public action")
+        expect(entry[:scope]).not_to include("#")
+        expect(entry[:scope]).to include("only:")
+      end
+    end
   end
 end

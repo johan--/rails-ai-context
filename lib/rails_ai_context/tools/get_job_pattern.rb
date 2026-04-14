@@ -28,23 +28,37 @@ module RailsAiContext
         root = Rails.root.to_s
         jobs_dir = File.join(root, "app", "jobs")
 
-        unless Dir.exist?(jobs_dir)
-          return text_response("No app/jobs/ directory found. This app may not use background jobs.")
+        job_files = if Dir.exist?(jobs_dir)
+          files = Dir.glob(File.join(jobs_dir, "**", "*.rb")).sort
+          files.reject { |f| File.basename(f) == "application_job.rb" }
+        else
+          []
         end
 
-        job_files = Dir.glob(File.join(jobs_dir, "**", "*.rb")).sort
-        # Filter out application_job.rb base class
-        job_files.reject! { |f| File.basename(f) == "application_job.rb" }
+        # Pull enriched channel data from the cached introspector context — this
+        # gives us the v5.8.0 fields (identified_by, streams, periodic, actions)
+        # that JobIntrospector#extract_channels populates.
+        channels = (cached_context.dig(:jobs, :channels) || []).reject { |c| c.is_a?(Hash) && c[:error] }
 
-        if job_files.empty?
-          return text_response("app/jobs/ directory exists but contains no job files (besides ApplicationJob).")
-        end
-
+        # Single-job query: requires jobs to be present.
         if job
+          return text_response("No app/jobs/ directory found. This app may not use background jobs.") if job_files.empty?
           return format_single_job(job, job_files, jobs_dir, root)
         end
 
-        format_job_listing(job_files, jobs_dir, root, detail)
+        # No jobs and no channels — bail out with the legacy message.
+        if job_files.empty? && channels.empty?
+          return text_response("No app/jobs/ directory found and no Action Cable channels detected. This app may not use background jobs.")
+        end
+
+        # Compose: jobs section (if any) + channels section (if any).
+        lines = []
+        lines.concat(format_job_listing_lines(job_files, jobs_dir, root, detail)) if job_files.any?
+        if channels.any?
+          lines << "" if lines.any?
+          lines.concat(format_channels_section(channels))
+        end
+        text_response(lines.join("\n"))
       end
 
       private_class_method def self.format_single_job(job, job_files, jobs_dir, root)
@@ -137,7 +151,7 @@ module RailsAiContext
         text_response(lines.join("\n"))
       end
 
-      private_class_method def self.format_job_listing(job_files, jobs_dir, root, detail)
+      private_class_method def self.format_job_listing_lines(job_files, jobs_dir, root, detail)
         job_data = []
 
         job_files.each do |file|
@@ -219,7 +233,50 @@ module RailsAiContext
           lines << "_Use `job:\"Name\"` to see enqueuers and cross-references._"
         end
 
-        text_response(lines.join("\n"))
+        lines
+      end
+
+      # Renders the v5.8.0 enriched Action Cable channel detail produced by
+      # JobIntrospector#extract_channels (identified_by, streams, periodic, actions).
+      # Returns lines, not a Response — caller composes.
+      private_class_method def self.format_channels_section(channels)
+        lines = [ "# Action Cable Channels (#{channels.size})", "" ]
+
+        channels.each do |c|
+          lines << "## `#{c[:name]}`"
+          lines << ""
+          lines << "- **File:** `#{c[:file]}`" if c[:file]
+
+          if (ids = c[:identified_by]) && ids.any?
+            lines << "- **Identified by:** #{ids.map { |i| "`#{i}`" }.join(', ')}"
+          end
+
+          if (streams = c[:streams])
+            from = Array(streams[:stream_from])
+            for_ = Array(streams[:stream_for])
+            lines << "- **stream_from:** #{from.map { |s| "`#{s}`" }.join(', ')}" if from.any?
+            lines << "- **stream_for:** #{for_.map { |s| "`#{s}`" }.join(', ')}"   if for_.any?
+          end
+
+          if (periodic = c[:periodic]) && periodic.any?
+            lines << "- **Periodic timers:**"
+            periodic.each do |t|
+              lines << "  - `#{t[:method]}` every `#{t[:every]}`"
+            end
+          end
+
+          if (actions = c[:actions]) && actions.any?
+            lines << "- **RPC actions:** #{actions.map { |a| "`#{a}`" }.join(', ')}"
+          end
+
+          if (sm = c[:stream_methods]) && sm.any?
+            lines << "- **Stream methods:** #{sm.map { |m| "`#{m}`" }.join(', ')}"
+          end
+
+          lines << ""
+        end
+
+        lines
       end
 
       private_class_method def self.extract_class_name(source)

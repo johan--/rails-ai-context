@@ -74,4 +74,99 @@ RSpec.describe RailsAiContext::Introspectors::JobIntrospector do
       expect(names).not_to include("ApplicationJob")
     end
   end
+
+  describe "channel source parsers" do
+    let(:source) do
+      <<~RUBY
+        class ChatChannel < ApplicationCable::Channel
+          identified_by :current_user, :tenant
+
+          periodically :ping, every: 3.seconds
+          periodically :sync_state, every: 30.seconds
+
+          def subscribed
+            stream_from "chat_room_general"
+            stream_for current_user
+          end
+
+          def speak(data)
+            ActionCable.server.broadcast("chat", data)
+          end
+
+          def stream_audio
+          end
+        end
+      RUBY
+    end
+
+    it "extracts identified_by attributes" do
+      expect(introspector.send(:extract_identified_by, source)).to contain_exactly("current_user", "tenant")
+    end
+
+    it "extracts stream_from and stream_for targets" do
+      streams = introspector.send(:extract_channel_streams, source)
+      expect(streams[:stream_from]).to include("chat_room_general")
+      expect(streams[:stream_for]).to include("current_user")
+    end
+
+    it "extracts periodically timers with intervals" do
+      timers = introspector.send(:extract_channel_periodic, source)
+      expect(timers).to be_an(Array)
+      expect(timers).to include(a_hash_including(method: "ping",       every: "3.seconds"))
+      expect(timers).to include(a_hash_including(method: "sync_state", every: "30.seconds"))
+    end
+
+    it "preserves complex intervals like lambdas without truncating them" do
+      complex = <<~RUBY
+        class TickerChannel < ApplicationCable::Channel
+          periodically :broadcast, every: -> { current_user.interval }
+        end
+      RUBY
+      timers = introspector.send(:extract_channel_periodic, complex)
+      expect(timers).to be_an(Array)
+      entry = timers.find { |t| t[:method] == "broadcast" }
+      expect(entry).not_to be_nil
+      expect(entry[:every]).to include("->")
+      expect(entry[:every]).to include("current_user.interval")
+    end
+
+    it "returns nil when source has no identified_by" do
+      expect(introspector.send(:extract_identified_by, "class Foo; end")).to be_nil
+    end
+
+    it "returns nil when source has no streams" do
+      expect(introspector.send(:extract_channel_streams, "class Foo; end")).to be_nil
+    end
+
+    it "returns nil when source has no periodic timers" do
+      expect(introspector.send(:extract_channel_periodic, "class Foo; end")).to be_nil
+    end
+  end
+
+  describe "#extract_channel_actions" do
+    let(:channel_class) do
+      Class.new do
+        def self.instance_methods(include_super = true)
+          %i[subscribed unsubscribed speak ping stream_audio stream_video]
+        end
+      end
+    end
+
+    let(:lifecycle_only_class) do
+      Class.new do
+        def self.instance_methods(include_super = true)
+          %i[subscribed unsubscribed]
+        end
+      end
+    end
+
+    it "returns RPC action methods, excluding lifecycle hooks and stream_* helpers" do
+      actions = introspector.send(:extract_channel_actions, channel_class)
+      expect(actions).to contain_exactly("ping", "speak")
+    end
+
+    it "returns nil when only lifecycle hooks are present" do
+      expect(introspector.send(:extract_channel_actions, lifecycle_only_class)).to be_nil
+    end
+  end
 end
