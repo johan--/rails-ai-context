@@ -130,18 +130,37 @@ module RailsAiContext
           return [ { uri: uri, mime_type: "application/json", text: content } ]
         end
 
-        # Verify resolved path is still under views_dir
-        unless File.realpath(full_path).start_with?(File.realpath(views_dir))
+        # Verify resolved path is still under views_dir. `start_with?` alone
+        # matches `/app/views_spec/x` against `/app/views` — so we append
+        # File::SEPARATOR (or accept exact equality for the dir itself).
+        # A symlink at `app/views/leak → ../views_spec/secret.html.erb`
+        # would otherwise escape the views tree. Fixed in v5.8.1.
+        real_view = File.realpath(full_path)
+        real_base = File.realpath(views_dir)
+        unless real_view == real_base || real_view.start_with?(real_base + File::SEPARATOR)
           raise RailsAiContext::Error, "Path not allowed: #{path}"
         end
 
+        # Defense-in-depth: re-run sensitive_file? on the realpath. If someone
+        # places a `.env` or `config/master.key` symlink inside `app/views/`,
+        # reject it even though the containment check passed. Mirrors the
+        # v5.8.1 fix in `get_edit_context.rb`.
+        relative_real = real_view.sub("#{real_base}/", "")
+        if RailsAiContext::Tools::BaseTool.send(:sensitive_file?, relative_real) ||
+           RailsAiContext::Tools::BaseTool.send(:sensitive_file?, path)
+          raise RailsAiContext::Error, "Path not allowed: #{path} (sensitive file)"
+        end
+
+        # Use the canonicalized realpath for size + read to eliminate the TOCTOU
+        # window between the containment/sensitive check and the actual file
+        # access. Mirrors the pattern in get_view.rb and get_edit_context.rb.
         max_size = RailsAiContext.configuration.max_file_size
-        if File.size(full_path) > max_size
-          content = JSON.pretty_generate(error: "File too large: #{path} (#{File.size(full_path)} bytes)")
+        if File.size(real_view) > max_size
+          content = JSON.pretty_generate(error: "File too large: #{path} (#{File.size(real_view)} bytes)")
           return [ { uri: uri, mime_type: "application/json", text: content } ]
         end
 
-        view_content = RailsAiContext::SafeFile.read(full_path) || ""
+        view_content = RailsAiContext::SafeFile.read(real_view) || ""
         mime = path.end_with?(".rb") ? "text/x-ruby" : "text/html"
         [ { uri: uri, mime_type: mime, text: view_content } ]
       end

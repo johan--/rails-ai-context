@@ -24,6 +24,7 @@ module RailsAiContext
       query_timeout query_row_limit query_redacted_columns allow_query_in_production
       log_lines introspectors
       hydration_enabled hydration_max_hints
+      instrumentation_include_arguments
     ].freeze
 
     # Load configuration from a YAML file, applying values to the current config instance.
@@ -131,6 +132,19 @@ module RailsAiContext
     # Debounce interval in seconds for live reload file watching
     attr_accessor :live_reload_debounce
 
+    # Whether to include raw tool arguments in ActiveSupport::Notifications
+    # instrumentation events. Default: false (v5.8.1+). When false, only
+    # metadata (method, tool_name, duration, error) is forwarded to
+    # subscribers. When true, `tool_arguments` and `arguments` are forwarded
+    # verbatim — including raw SQL from `rails_query`, env var names from
+    # `rails_get_env`, and log search patterns from `rails_read_logs`.
+    #
+    # Setting this to true means the operator takes on the redaction
+    # obligation for any downstream observability pipeline (Datadog, Scout,
+    # custom loggers) that receives these events. See CHANGELOG.md for v5.8.1
+    # for the security review that changed the default.
+    attr_accessor :instrumentation_include_arguments
+
     # Whether to generate root-level context files (CLAUDE.md, AGENTS.md, etc.)
     # When false, only generates split rule files (.claude/rules/, .cursor/rules/, etc.)
     attr_accessor :generate_root_files
@@ -229,8 +243,15 @@ module RailsAiContext
       @introspectors       = PRESETS[:full].dup
       @excluded_paths      = %w[node_modules tmp log vendor .git doc docs]
       @sensitive_patterns  = %w[
-        .env .env.* config/master.key config/credentials.yml.enc
-        config/credentials/*.yml.enc *.pem *.key
+        .env .env.*
+        config/master.key
+        config/credentials.yml.enc config/credentials/*.yml.enc
+        config/database.yml config/secrets.yml
+        config/cable.yml config/storage.yml
+        config/mongoid.yml config/redis.yml
+        *.pem *.key *.p12 *.pfx *.jks *.keystore
+        **/id_rsa **/id_ed25519 **/id_ecdsa **/id_dsa
+        .ssh/* .aws/credentials .aws/config .netrc .pgpass .my.cnf
       ]
       @auto_mount          = false
       @http_path           = "/mcp"
@@ -249,6 +270,7 @@ module RailsAiContext
       @max_tool_response_chars  = 200_000
       @live_reload              = :auto
       @live_reload_debounce     = 1.5
+      @instrumentation_include_arguments = false
       @generate_root_files      = true
       @anti_hallucination_rules = true
       @max_file_size            = 5_000_000

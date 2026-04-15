@@ -166,6 +166,44 @@ RSpec.describe RailsAiContext::VFS do
         data = JSON.parse(result.first[:text])
         expect(data["error"]).to include("not found")
       end
+
+      it "blocks sibling-directory traversal via symlink (v5.8.1 C1)" do
+        # Reproduces the v5.8.1 security review finding: String#start_with?
+        # without a File::SEPARATOR check matches `/a/views_spec` against
+        # `/a/views` prefix, letting a symlink in app/views/ escape to a
+        # sibling directory.
+        sibling_dir = Rails.root.join("app", "views_spec_#{Process.pid}")
+        FileUtils.mkdir_p(sibling_dir)
+        secret_file = sibling_dir.join("secret.html.erb")
+        File.write(secret_file, "<h1>SIBLING SECRET</h1>")
+
+        symlink = views_dir.join("leak_#{Process.pid}.html.erb")
+        File.symlink(secret_file, symlink)
+
+        expect {
+          described_class.resolve("rails-ai-context://views/leak_#{Process.pid}.html.erb")
+        }.to raise_error(RailsAiContext::Error, /not allowed/)
+      ensure
+        FileUtils.rm_f(symlink) if defined?(symlink)
+        FileUtils.rm_rf(sibling_dir) if defined?(sibling_dir)
+      end
+
+      it "blocks sensitive files resolved via symlink (v5.8.1 C1 defense-in-depth)" do
+        # If a .key or .env file is symlinked into app/views/, the realpath
+        # would be under views_dir but the file is sensitive. sensitive_file?
+        # on the realpath catches this.
+        secret = Rails.root.join("config", "_vfs_test_master_#{Process.pid}.key")
+        File.write(secret, "should-never-leak")
+        symlink = views_dir.join("leak_secret_#{Process.pid}.key")
+        File.symlink(secret, symlink)
+
+        expect {
+          described_class.resolve("rails-ai-context://views/leak_secret_#{Process.pid}.key")
+        }.to raise_error(RailsAiContext::Error, /sensitive|not allowed/)
+      ensure
+        FileUtils.rm_f(symlink) if defined?(symlink)
+        FileUtils.rm_f(secret) if defined?(secret)
+      end
     end
 
     context "unknown URI" do

@@ -174,7 +174,9 @@ module RailsAiContext
       # Tries db/schema.rb first, then db/structure.sql, then migrations.
       # This enables introspection in CI, Claude Code, etc.
       def static_schema_parse
-        if File.exist?(schema_file_path)
+        schema_rb_exists = File.exist?(schema_file_path)
+
+        if schema_rb_exists
           result = parse_schema_rb(schema_file_path)
           return result if result[:total_tables].to_i > 0
         end
@@ -186,6 +188,18 @@ module RailsAiContext
 
         if Dir.exist?(migrations_dir) && Dir.glob(File.join(migrations_dir, "*.rb")).any?
           return parse_migrations
+        end
+
+        # schema.rb exists but has no tables — happens on fresh Rails apps right
+        # after `db:create` where no migrations have been run yet. Return a
+        # legitimate empty-schema state instead of a misleading "not found" error.
+        if schema_rb_exists
+          return {
+            total_tables: 0,
+            tables: {},
+            note: "Schema file exists but is empty — no migrations have been run yet. " \
+                  "Run `bin/rails db:migrate` after generating migrations to populate schema.rb."
+          }
         end
 
         { error: "No db/schema.rb, db/structure.sql, or migrations found" }
