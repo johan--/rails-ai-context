@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed — Security Hardening
 
-Two exploitable vulnerabilities in `rails_query` and four defense-in-depth hardening issues. All discovered by an adversarial security review conducted during v5.8.1 pre-release verification. None were known at the v5.8.0 release — users should upgrade immediately.
+Four exploitable vulnerabilities across `rails_query`, the VFS URI dispatcher, and the instrumentation bridge, plus six defense-in-depth hardening issues. All discovered by security and deep code-review passes conducted during v5.8.1 pre-release verification. None were known at the v5.8.0 release — **users should upgrade immediately**.
 
 - **SQL column-aliasing redaction bypass (exploitable).** Post-execution redaction in `rails_query` operated on `result.columns` (the DB-returned column names), which the caller controls via aliases and expressions. `SELECT password_digest AS x FROM users` returned raw bcrypt hashes. Same for `SELECT substring(password_digest, 1, 60) FROM users` (column named `substring`), `SELECT md5(session_data) FROM sessions`, `SELECT CASE WHEN id > 0 THEN password_digest END FROM users`, and subqueries that re-project the sensitive column. **Fix:** moved enforcement to pre-execution in `validate_sql`. Any query that textually references a column name in `config.query_redacted_columns` OR the hard-coded `SENSITIVE_COLUMN_SUFFIXES` list (password_digest, encrypted_password, password_hash, reset_password_token, api_key, refresh_token, otp_secret, session_data, secret_key, private_key, etc.) is now rejected. Users with a legitimately non-sensitive column matching one of these names can subtract from `config.query_redacted_columns` in an initializer. **8 bypass scenarios covered by new specs.**
 
@@ -22,6 +22,18 @@ Two exploitable vulnerabilities in `rails_query` and four defense-in-depth harde
 - **`validate` now enforces `sensitive_file?`.** The validate tool had no sensitive-file check at all. Even though its output is limited to error messages (not raw content), it still leaked file existence/size and ran readers on secret files. Now denied with an `access denied (sensitive file)` error.
 
 - **`BaseTool.sensitive_file?` has direct spec coverage for the first time.** The security boundary behind every file-accepting tool had zero direct tests in v5.8.0 — 36 new specs added covering the Rails secret locations, the v5.8.1 expanded pattern list, private keys and certificates, case-insensitivity, basename-only matching, and custom pattern configurations.
+
+- **VFS `resolve_view` sibling-directory path traversal (exploitable).** The `rails-ai-context://views/{path}` URI resolver used bare `String#start_with?` on the realpath without a `File::SEPARATOR` suffix check. `/app/views_spec/secret.erb` matched `/app/views` as a prefix, so a symlink inside `app/views/` pointing at a sibling directory escaped containment and returned arbitrary file content. **Fix:** changed the containment check to `real == base || real.start_with?(base + File::SEPARATOR)`. Also added a `sensitive_file?` realpath check mirroring the v5.8.1 `get_edit_context` fix, so `.env`/`.key` symlinks inside `app/views/` are rejected. **2 new regression specs covering both PoCs.**
+
+- **Instrumentation bridge leaks raw tool arguments to ActiveSupport::Notifications subscribers (exploitable).** `Instrumentation.callback` forwarded the MCP SDK's full data hash to `ActiveSupport::Notifications.instrument`. The SDK's `add_instrumentation_data(tool_name:, tool_arguments:)` includes raw tool inputs — so every Rails observability subscriber (Datadog, Scout, New Relic, custom loggers) received `rails_query`'s raw SQL, `rails_get_env`'s env var names, and `rails_read_logs`'s search patterns unredacted. The response-side redaction each of those tools carefully implements did nothing for the request side. **Fix:** introduced `Instrumentation::SAFE_KEYS` (`method`, `tool_name`, `duration`, `error`, `resource_uri`, `prompt_name`) — only those fields are forwarded. Users who need arguments in observability can set `config.instrumentation_include_arguments = true` in an initializer (taking on the redaction obligation). **3 new regression specs.**
+
+- **Instrumentation subscriber failures could crash tool calls (exploitable).** The MCP SDK's `instrument_call` invokes our callback from an `ensure` block. Any exception raised inside the callback (e.g. a custom subscriber bug, a Datadog client losing connection) would propagate out of `ensure` and overwrite the tool's actual return value — effectively failing every tool call whenever any subscriber was broken. **Fix:** wrapped the `Notifications.instrument` call in a `rescue => e` block. Subscriber failures now log to stderr under `DEBUG=1` instead of corrupting tool responses. **1 new regression spec.**
+
+- **`analyze_feature` caps per-directory file scans at 500 files.** `discover_services`, `discover_jobs`, and `discover_views` previously ran unbounded `Dir.glob` + `SafeFile.read` on every match, which on large monorepos could read thousands of files per call. Matches the existing cap used by `discover_tests`. Tool output notes when the cap was hit so the AI agent knows to narrow its feature keyword.
+
+### Added — Configuration
+
+- **`config.instrumentation_include_arguments`** (default `false`) — controls whether raw tool arguments are forwarded to `ActiveSupport::Notifications` subscribers. See the Security Hardening note above for the opt-in risk.
 
 ### Performance — Hot-Path Optimization
 
@@ -41,7 +53,7 @@ Two exploitable vulnerabilities in `rails_query` and four defense-in-depth harde
 
 ### Test coverage
 
-- **1982 examples, 0 failures** (was 1928 in v5.8.0, +54 new regression tests across the security + hardening + empty-schema fixes).
+- **1989 examples, 0 failures** (was 1928 in v5.8.0, +61 new regression tests across the security + hardening + empty-schema + VFS + instrumentation fixes).
 
 ## [5.8.0] — 2026-04-14
 

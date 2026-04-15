@@ -23,6 +23,12 @@ module RailsAiContext
 
       # Map well-known feature keywords to gem-based patterns
       AUTH_KEYWORDS = %w[auth authentication login signup signin session devise omniauth].freeze
+
+      # Cap per-directory file scans to avoid unbounded Dir.glob + SafeFile.read
+      # on large monorepos. Matches the pattern used by discover_tests. Tool
+      # output notes when the cap is hit so the AI agent knows to narrow its
+      # feature keyword. v5.8.1 hardening.
+      MAX_SCAN_FILES = 500
       AUTH_GEM_NAMES = %w[devise omniauth rodauth sorcery clearance authlogic warden jwt].freeze
 
       def self.call(feature:, server_context: nil) # rubocop:disable Metrics
@@ -192,13 +198,17 @@ module RailsAiContext
           dir = File.join(root, "app", "services")
           return unless Dir.exist?(dir)
 
-          found = Dir.glob(File.join(dir, "**", "*.rb")).select do |path|
-            File.basename(path, ".rb").include?(pattern) ||
-              (File.size(path) < 50_000 && (RailsAiContext::SafeFile.read(path) || "").downcase.include?(pattern))
+          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          # Prefer basename match (fast, no file read) and only fall back to
+          # a content scan for files whose basename doesn't match. This
+          # avoids reading every service file's full contents on large apps.
+          found = candidates.select do |path|
+            next true if File.basename(path, ".rb").include?(pattern)
+            File.size(path) < 50_000 && (RailsAiContext::SafeFile.read(path) || "").downcase.include?(pattern)
           end
           return if found.empty?
 
-          lines << "## Services (#{found.size})"
+          lines << "## Services (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
@@ -218,12 +228,13 @@ module RailsAiContext
           dir = File.join(root, "app", "jobs")
           return unless Dir.exist?(dir)
 
-          found = Dir.glob(File.join(dir, "**", "*.rb")).select do |path|
+          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          found = candidates.select do |path|
             File.basename(path, ".rb").include?(pattern)
           end
           return if found.empty?
 
-          lines << "## Jobs (#{found.size})"
+          lines << "## Jobs (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
             relative = path.sub("#{root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
@@ -242,12 +253,13 @@ module RailsAiContext
           views_dir = File.join(root, "app", "views")
           return unless Dir.exist?(views_dir)
 
-          found = Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).select do |path|
+          candidates = Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).first(MAX_SCAN_FILES)
+          found = candidates.select do |path|
             path.sub("#{views_dir}/", "").downcase.include?(pattern)
           end
           return if found.empty?
 
-          lines << "## Views (#{found.size})"
+          lines << "## Views (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
             relative = path.sub("#{views_dir}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
