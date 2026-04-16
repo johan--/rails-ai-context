@@ -94,7 +94,15 @@ RSpec.describe "E2E: massive Rails app (1500 models)", type: :e2e do
       FileUtils.mkdir_p(models_dir)
       FileUtils.mkdir_p(migrate_dir)
 
-      timestamp = Time.now.strftime("%Y%m%d%H%M%S")
+      # Avoid ActiveRecord::DuplicateMigrationVersionError: the scaffold
+      # migration written by `rails g scaffold Post` uses Time.now at the
+      # same second we'd get here. Find the max existing migration
+      # version and add 1 to guarantee a later timestamp.
+      existing_versions = Dir.glob(File.join(migrate_dir, "*_*.rb")).map do |f|
+        File.basename(f)[/\A(\d+)_/, 1].to_i
+      end
+      base = [ Time.now.strftime("%Y%m%d%H%M%S").to_i, existing_versions.max.to_i ].max
+      timestamp = (base + 1).to_s
       migration_path = File.join(migrate_dir, "#{timestamp}_create_many_tables.rb")
 
       File.open(migration_path, "w") do |f|
