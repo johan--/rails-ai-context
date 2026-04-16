@@ -60,7 +60,6 @@ jobs:
     env:
       E2E: "1"
       RAILS_VERSION: ${{ matrix.rails }}
-      BUNDLE_WITHOUT: "development"
       # Postgres connection params consumed by spec/e2e/postgres_install_spec.rb
       # via the rewritten config/database.yml in TestAppBuilder.
       TEST_POSTGRES: "1"
