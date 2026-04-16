@@ -8,20 +8,24 @@ module E2E
   #   :standalone  — build gem, install to isolated GEM_HOME, run `rails-ai-context init`
   #   :zero_config — same GEM_HOME setup, but no init/generator — just serve with defaults
   class TestAppBuilder
-    RAILS_NEW_FLAGS = %w[
+    BASE_RAILS_NEW_FLAGS = %w[
       --skip-bundle --skip-git --skip-spring --skip-listen
       --skip-javascript --skip-test --skip-system-test --skip-bootsnap
       --skip-dev-gems --skip-rubocop --skip-ci --skip-kamal --skip-solid
       --skip-thruster --skip-docker
-      --database=sqlite3
     ].freeze
 
-    attr_reader :app_path, :install_path, :gem_home
+    attr_reader :app_path, :install_path, :gem_home, :database
 
-    def initialize(parent_dir:, name:, install_path:)
+    def initialize(parent_dir:, name:, install_path:, database: :sqlite3)
       @app_path     = File.join(parent_dir, name)
       @install_path = install_path
       @gem_home     = File.join(parent_dir, "gemhome-#{name}")
+      @database     = database
+    end
+
+    def rails_new_flags
+      BASE_RAILS_NEW_FLAGS + [ "--database=#{database}" ]
     end
 
     # Build the app + install the gem per the chosen path.
@@ -95,11 +99,39 @@ module E2E
 
     def run_rails_new!
       FileUtils.mkdir_p(File.dirname(app_path))
-      cmd = [ "rails", "new", app_path, *RAILS_NEW_FLAGS ]
+      cmd = [ "rails", "new", app_path, *rails_new_flags ]
       stdout, stderr, status = Open3.capture3(*cmd)
       unless status.success?
         raise "rails new failed:\n  STDOUT:\n#{stdout}\n  STDERR:\n#{stderr}"
       end
+      # Postgres `rails new` writes a database.yml that points at unix-socket
+      # localhost:5432 and a default db name of `<app>_development`. CI's
+      # postgres service exposes credentials via env vars; rewrite the
+      # database.yml to honor PGHOST/PGUSER/PGPASSWORD when provided.
+      configure_postgres_yml! if database == :postgresql
+    end
+
+    def configure_postgres_yml!
+      yml_path = File.join(app_path, "config", "database.yml")
+      return unless File.exist?(yml_path)
+      File.write(yml_path, <<~YAML)
+        default: &default
+          adapter: postgresql
+          encoding: unicode
+          host: <%= ENV.fetch("PGHOST") { "localhost" } %>
+          port: <%= ENV.fetch("PGPORT") { 5432 } %>
+          username: <%= ENV.fetch("PGUSER") { "postgres" } %>
+          password: <%= ENV.fetch("PGPASSWORD") { "" } %>
+          pool: 5
+
+        development:
+          <<: *default
+          database: rails_ai_context_e2e_dev_<%= ENV.fetch("E2E_DB_SUFFIX") { "0" } %>
+
+        test:
+          <<: *default
+          database: rails_ai_context_e2e_test_<%= ENV.fetch("E2E_DB_SUFFIX") { "0" } %>
+      YAML
     end
 
     # Generate one model + one controller so schema/model/routes tools

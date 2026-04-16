@@ -35,9 +35,11 @@ Real `rails new` → install → exercise → teardown against a fresh Rails app
 
 - **`spec/e2e/concurrent_mcp_spec.rb`** — two parallel `rails-ai-context serve` subprocesses against the same Rails app. Verifies independent initialize responses, identical tool registries, and that simultaneous `tools/call` invocations don't cross-talk (response id matches request id per client).
 
+- **`spec/e2e/postgres_install_spec.rb`** — Postgres adapter coverage for the `rails_query` tool's adapter-specific code paths: `SET TRANSACTION READ ONLY`, `BLOCKED_FUNCTIONS` regex against `pg_read_file`, `dblink`, `COPY ... PROGRAM`, and DDL rejection. Skipped locally unless `TEST_POSTGRES=1`; runs unconditionally in CI which spins up a Postgres 16 service container.
+
 Rake tasks: `bundle exec rake e2e` (full), `rake e2e:in_gemfile`, `rake e2e:standalone`, `rake e2e:zero_config`, `rake e2e:mcp`.
 
-CI: `.github/workflows/e2e.yml` runs on push to main + workflow_dispatch (separate from `ci.yml` so the 30-min job doesn't fail-stop the per-commit matrix). Matrix covers Ruby 3.3 + 3.4 across Rails 7.1, 7.2, 8.0, 8.1.
+CI: `.github/workflows/e2e.yml` runs on push to main + workflow_dispatch (separate from `ci.yml` so the 30-min job doesn't fail-stop the per-commit matrix). Matrix covers Ruby 3.3 + 3.4 across Rails 7.1, 7.2, 8.0, 8.1, and includes a Postgres 16 service container so the SQL-query and adapter-specific code paths are exercised on every push.
 
 ### Fixed — Security Hardening (Round 3)
 

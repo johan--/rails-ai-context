@@ -40,10 +40,32 @@ jobs:
 
     name: E2E — Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        # Wait for postgres to be ready before starting the harness.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       E2E: "1"
       RAILS_VERSION: ${{ matrix.rails }}
       BUNDLE_WITHOUT: "development"
+      # Postgres connection params consumed by spec/e2e/postgres_install_spec.rb
+      # via the rewritten config/database.yml in TestAppBuilder.
+      TEST_POSTGRES: "1"
+      PGHOST: "localhost"
+      PGPORT: "5432"
+      PGUSER: "postgres"
+      PGPASSWORD: "postgres"
 
     steps:
       - uses: actions/checkout@v6
@@ -59,7 +81,18 @@ jobs:
           RAILS_MAJOR_MINOR: ${{ matrix.rails }}
         run: gem install rails -v "~> ${RAILS_MAJOR_MINOR}.0" --no-document
 
+      - name: Install Postgres client + create per-job DB names
+        env:
+          E2E_DB_SUFFIX: ${{ matrix.ruby }}-${{ matrix.rails }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          # Create the dev + test databases referenced by config/database.yml
+          PGPASSWORD="$PGPASSWORD" createdb -h "$PGHOST" -U "$PGUSER" "rails_ai_context_e2e_dev_${E2E_DB_SUFFIX}"
+          PGPASSWORD="$PGPASSWORD" createdb -h "$PGHOST" -U "$PGUSER" "rails_ai_context_e2e_test_${E2E_DB_SUFFIX}"
+
       - name: Run E2E harness
+        env:
+          E2E_DB_SUFFIX: ${{ matrix.ruby }}-${{ matrix.rails }}
         run: bundle exec rspec spec/e2e --format documentation --format json --out tmp/e2e-report.json
         timeout-minutes: 25
 
