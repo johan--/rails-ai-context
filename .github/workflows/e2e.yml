@@ -1,0 +1,63 @@
+name: E2E
+
+# End-to-end harness — builds a fresh Rails app per install path
+# (in-Gemfile, standalone, zero-config), exercises the install generator,
+# every CLI tool, the MCP stdio protocol, and the MCP HTTP protocol.
+#
+# Runs on push to main and on manual dispatch. Skipped on PRs (too slow
+# for the signal-to-noise ratio — unit + hardening specs cover PR surface).
+# Runs separately from ci.yml so the 30-min job doesn't fail-stop the
+# per-commit matrix.
+#
+# Security: matrix values (ruby/rails versions) are workflow-controlled,
+# not attacker-controlled. No untrusted github.event.* inputs are used.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ruby: "3.4"
+            rails: "8.0"
+
+    name: E2E — Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}
+
+    env:
+      E2E: "1"
+      RAILS_VERSION: ${{ matrix.rails }}
+      BUNDLE_WITHOUT: "development"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Install Rails globally (for `rails new`)
+        env:
+          RAILS_MAJOR_MINOR: ${{ matrix.rails }}
+        run: gem install rails -v "~> ${RAILS_MAJOR_MINOR}.0" --no-document
+
+      - name: Run E2E harness
+        run: bundle exec rspec spec/e2e --format documentation --format json --out tmp/e2e-report.json
+        timeout-minutes: 25
+
+      - name: Upload E2E report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-ruby${{ matrix.ruby }}-rails${{ matrix.rails }}
+          path: tmp/e2e-report.json
+          retention-days: 14

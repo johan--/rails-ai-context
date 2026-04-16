@@ -23,4 +23,10 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
   config.order = :random
   Kernel.srand config.seed
+
+  # Skip e2e specs unless explicitly requested via E2E=1.
+  # E2E specs spawn fresh Rails apps per install path and take minutes
+  # per run; they belong on a dedicated CI pipeline, not every push.
+  # Run them with: E2E=1 bundle exec rspec spec/e2e
+  config.filter_run_excluding(type: :e2e) unless ENV["E2E"] == "1"
 end
