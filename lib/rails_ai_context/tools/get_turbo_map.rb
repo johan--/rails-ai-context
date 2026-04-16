@@ -339,12 +339,13 @@ module RailsAiContext
         models_dir = File.join(root, "app", "models")
         return results unless Dir.exist?(models_dir)
 
-        Dir.glob(File.join(models_dir, "**", "*.rb")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(models_dir, "**/*.rb", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
           model_name = extract_class_name(source) || File.basename(file, ".rb").camelize
 
           source.each_line.with_index(1) do |line, line_num|
@@ -371,17 +372,18 @@ module RailsAiContext
       # Handles multi-line calls by joining the method line with subsequent lines
       private_class_method def self.scan_rb_broadcasts(root)
         results = []
+        real_root = File.realpath(root).to_s
         search_dirs = %w[app/controllers app/models app/services app/jobs app/workers app/channels].map { |d| File.join(root, d) }
 
         search_dirs.each do |dir|
           next unless Dir.exist?(dir)
 
-          Dir.glob(File.join(dir, "**", "*.rb")).sort.each do |file|
+          safe_glob(dir, "**/*.rb", real_root).sort.each do |file|
             next if File.size(file) > max_file_size
             source = safe_read(file)
             next unless source
 
-            relative = file.sub("#{root}/", "")
+            relative = file.sub("#{real_root}/", "")
             lines = source.lines
 
             lines.each_with_index do |line, idx|
@@ -419,12 +421,13 @@ module RailsAiContext
         views_dir = File.join(root, "app", "views")
         return results unless Dir.exist?(views_dir)
 
-        Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(views_dir, "**/*.{erb,haml,slim}", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
 
           source.each_line.with_index(1) do |line, line_num|
             next unless line.include?("turbo_stream_from")
@@ -448,12 +451,13 @@ module RailsAiContext
         views_dir = File.join(root, "app", "views")
         return results unless Dir.exist?(views_dir)
 
-        Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(views_dir, "**/*.{erb,haml,slim}", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
 
           source.each_line.with_index(1) do |line, line_num|
             next unless line.include?("turbo_frame_tag")
@@ -497,14 +501,14 @@ module RailsAiContext
 
       # Extract stream name from broadcast_*_to call
       private_class_method def self.extract_stream_from_broadcast(line, method)
-        # Try string interpolation first: "cook_#{cook.id}" → "cook_#{id}"
+        # Try string interpolation first: "post_#{post.id}" → "post_#{id}"
         interp_pattern = /#{Regexp.escape(method)}\s*\(?\s*["']([^"']*#\{[^}]+\}[^"']*)["']/
         interp_match = line.match(interp_pattern)
         if interp_match
-          # Normalize: "cook_#{cook.id}" → "cook_{id}", "cook_#{@cook.id}" → "cook_{id}"
+          # Normalize: "post_#{post.id}" → "post_{id}", "post_#{@post.id}" → "post_{id}"
           return interp_match[1].gsub(/#\{(.+?)\}/) { |_|
             expr = $1.strip
-            # Extract the last method call: "@cook.id" → "id", "cook.id" → "id", "id" → "id"
+            # Extract the last method call: "@post.id" → "id", "post.id" → "id", "id" → "id"
             last_method = expr.split(".").last
             "{#{last_method}}"
           }
@@ -545,13 +549,13 @@ module RailsAiContext
         # turbo_stream_from "notifications"
         # turbo_stream_from @room
         # turbo_stream_from current_user, :notifications
-        # turbo_stream_from "cook_#{@cook.id}"
+        # turbo_stream_from "post_#{@post.id}"
         match = line.match(/turbo_stream_from\s+(.+?)(?:\s*%>|\s*$|\s*do\b)/)
         return "(dynamic)" unless match
 
         args = match[1].strip
 
-        # Handle string interpolation: "cook_#{@cook.id}" → "cook_{id}"
+        # Handle string interpolation: "post_#{@post.id}" → "post_{id}"
         if args.include?("#")
           normalized = args.gsub(/["']/, "").gsub(/#\{(.+?)\}/) { |_|
             expr = $1.strip
@@ -630,8 +634,8 @@ module RailsAiContext
         []
       end
 
-      # Fuzzy-match stream names: "cook_{id}" matches "cook_{id}",
-      # and static prefixes match (e.g., "cook_" prefix in both)
+      # Fuzzy-match stream names: "post_{id}" matches "post_{id}",
+      # and static prefixes match (e.g., "post_" prefix in both)
       private_class_method def self.streams_match?(a, b)
         return true if a == b
 

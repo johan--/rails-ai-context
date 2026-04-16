@@ -177,9 +177,10 @@ module RailsAiContext
 
       # Scan controllers for app-specific authorization, flash, and error-handling patterns
       private_class_method def self.detect_app_patterns
-        controllers_dir = Rails.root.join("app", "controllers")
+        controllers_dir = Rails.root.join("app", "controllers").to_s
         return [] unless Dir.exist?(controllers_dir)
 
+        real_root = File.realpath(Rails.root).to_s
         auth_checks = []
         auth_denials = []
         flash_notices = []
@@ -189,7 +190,7 @@ module RailsAiContext
         show_only_controllers = []
         has_services = Dir.exist?(Rails.root.join("app", "services"))
 
-        Dir.glob(File.join(controllers_dir, "**", "*.rb")).each do |path|
+        safe_glob(controllers_dir, "**/*.rb", real_root).each do |path|
           content = RailsAiContext::SafeFile.read(path) or next
           controller_name = File.basename(path, ".rb")
 
@@ -311,11 +312,12 @@ module RailsAiContext
         sections.concat(test_pattern) if test_pattern.any?
 
         if has_services
-          service_files = Dir.glob(Rails.root.join("app", "services", "**", "*.rb"))
+          services_dir = Rails.root.join("app", "services").to_s
+          service_files = safe_glob(services_dir, "**/*.rb", real_root)
           if service_files.any?
             sections << "" << "### Service Objects"
             service_files.first(10).each do |sf|
-              rel = sf.sub("#{Rails.root}/", "")
+              rel = sf.sub("#{real_root}/", "")
               sections << "- `#{rel}`"
             end
           end
@@ -328,10 +330,11 @@ module RailsAiContext
 
       private_class_method def self.detect_locale_info
         info = []
-        locales_dir = Rails.root.join("config", "locales")
+        locales_dir = Rails.root.join("config", "locales").to_s
         return info unless Dir.exist?(locales_dir)
 
-        locale_files = Dir.glob(File.join(locales_dir, "**", "*.{yml,yaml,rb}"))
+        real_root = File.realpath(Rails.root).to_s
+        locale_files = safe_glob(locales_dir, "**/*.{yml,yaml,rb}", real_root)
         locales = locale_files.map { |f| File.basename(f, ".*").split(".").first }.uniq.sort
 
         return info if locales.empty?
@@ -348,10 +351,10 @@ module RailsAiContext
         end
 
         # Detect primary UI language by sampling flash messages from controllers
-        controllers_dir = Rails.root.join("app", "controllers")
+        controllers_dir = Rails.root.join("app", "controllers").to_s
         if Dir.exist?(controllers_dir)
           samples = []
-          Dir.glob(File.join(controllers_dir, "**", "*.rb")).first(10).each do |path|
+          safe_glob(controllers_dir, "**/*.rb", real_root).first(10).each do |path|
             content = RailsAiContext::SafeFile.read(path) or next
             content.scan(/(?:notice|alert|flash\[:\w+\]):\s*"([^"]+)"/).each { |m| samples << m[0] }
           end
@@ -381,10 +384,11 @@ module RailsAiContext
 
       private_class_method def self.detect_test_pattern
         sections = []
-        test_dir = Rails.root.join("test", "controllers")
+        test_dir = Rails.root.join("test", "controllers").to_s
         return sections unless Dir.exist?(test_dir)
 
-        test_files = Dir.glob(File.join(test_dir, "**", "*_test.rb"))
+        real_root = File.realpath(Rails.root).to_s
+        test_files = safe_glob(test_dir, "**/*_test.rb", real_root)
         return sections if test_files.empty?
 
         has_devise = false
@@ -421,7 +425,7 @@ module RailsAiContext
           sections << ""
         end
         sections << "  test \"[action] renders page\" do"
-        sections << "    sign_in users(:chef_one)" if has_sign_in
+        sections << "    sign_in users(:one)" if has_sign_in
         sections << "    get [path]"
         sections << "    assert_response :success"
         sections << "    assert_select \"h1\", \"[Expected Title]\"" if has_assert_select

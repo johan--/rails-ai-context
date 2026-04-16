@@ -5,4 +5,42 @@ require "rspec/core/rake_task"
 
 RSpec::Core::RakeTask.new(:spec)
 
+# E2E harness — runs specs under spec/e2e/ with E2E=1 so they're not
+# excluded by spec/spec_helper.rb. Each install-path spec spawns a
+# fresh Rails app in a tmpdir and can take minutes.
+#
+# Usage:
+#   bundle exec rake e2e              # full suite
+#   bundle exec rake e2e:in_gemfile   # just Path A
+#   bundle exec rake e2e:standalone   # just Path B
+#   bundle exec rake e2e:zero_config  # just Path C
+#   bundle exec rake e2e:mcp          # stdio + HTTP protocol specs
+namespace :e2e do
+  RSpec::Core::RakeTask.new(:in_gemfile) do |t|
+    t.pattern = "spec/e2e/in_gemfile_install_spec.rb"
+    ENV["E2E"] = "1"
+  end
+
+  RSpec::Core::RakeTask.new(:standalone) do |t|
+    t.pattern = "spec/e2e/standalone_install_spec.rb"
+    ENV["E2E"] = "1"
+  end
+
+  RSpec::Core::RakeTask.new(:zero_config) do |t|
+    t.pattern = "spec/e2e/zero_config_install_spec.rb"
+    ENV["E2E"] = "1"
+  end
+
+  RSpec::Core::RakeTask.new(:mcp) do |t|
+    t.pattern = "spec/e2e/mcp_{stdio,http}_protocol_spec.rb"
+    ENV["E2E"] = "1"
+  end
+end
+
+desc "Run the full E2E harness (fresh Rails app per install path)"
+RSpec::Core::RakeTask.new(:e2e) do |t|
+  t.pattern = "spec/e2e/**/*_spec.rb"
+  ENV["E2E"] = "1"
+end
+
 task default: :spec

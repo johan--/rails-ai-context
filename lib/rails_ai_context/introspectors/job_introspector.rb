@@ -202,7 +202,8 @@ module RailsAiContext
         return nil unless method_source
         location = channel.instance_method(method_source).source_location
         location&.first
-      rescue
+      rescue => e
+        $stderr.puts "[rails-ai-context] channel_absolute_path failed: #{e.message}" if ENV["DEBUG"]
         nil
       end
 

@@ -6,7 +6,7 @@ module RailsAiContext
       tool_name "rails_generate_test"
       description "Generate test scaffolding that matches your project's actual test patterns — framework, factories, assertion style. " \
         "Use when: adding tests for a model, controller, or service. Generates copy-paste-ready test files. " \
-        "Key params: model (e.g. 'User'), controller (e.g. 'CooksController'), file (e.g. 'app/services/foo.rb')."
+        "Key params: model (e.g. 'User'), controller (e.g. 'PostsController'), file (e.g. 'app/services/foo.rb')."
 
       input_schema(
         properties: {
@@ -16,7 +16,7 @@ module RailsAiContext
           },
           controller: {
             type: "string",
-            description: "Controller name (e.g. 'CooksController'). Generates request spec with routes and auth."
+            description: "Controller name (e.g. 'PostsController'). Generates request spec with routes and auth."
           },
           file: {
             type: "string",
@@ -66,10 +66,11 @@ module RailsAiContext
         # Scan existing tests to learn project patterns
         def detect_patterns(framework) # rubocop:disable Metrics
           root = Rails.root.to_s
+          real_root = File.realpath(root).to_s
           patterns = { factory_style: :create, let_style: true, expect_style: true, described_class: true }
 
-          glob = framework == "rspec" ? "spec/**/*_spec.rb" : "test/**/*_test.rb"
-          files = Dir.glob(File.join(root, glob)).first(5)
+          dir, glob = framework == "rspec" ? [ "spec", "**/*_spec.rb" ] : [ "test", "**/*_test.rb" ]
+          files = safe_glob(File.join(root, dir), glob, real_root).first(5)
 
           expect_count = 0
           should_count = 0
@@ -360,7 +361,7 @@ module RailsAiContext
 
         def generate_controller_test(ctrl_name, framework, patterns, tests_data)
           ctrl_name = ctrl_name.strip
-          # Normalize: "cooks" → "CooksController", "CooksController" stays
+          # Normalize: "posts" → "PostsController", "PostsController" stays
           ctrl_class = ctrl_name.end_with?("Controller") ? ctrl_name : "#{ctrl_name.camelize}Controller"
           snake = ctrl_class.underscore.delete_suffix("_controller")
 
@@ -563,7 +564,7 @@ module RailsAiContext
         # Falls back to :one if no fixture file is found.
         def resolve_fixture_key(model_name, fixture_names)
           plural = model_name.underscore.pluralize
-          # fixture_names is { "users" => [:chef_one, :chef_two], "cooks" => [:pending_cook, ...] }
+          # fixture_names is { "users" => [:one, :two], "posts" => [:draft_post, ...] }
           keys = fixture_names[plural] || fixture_names[plural.to_sym]
           if keys.is_a?(Array) && keys.any?
             ":#{keys.first}"

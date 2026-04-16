@@ -253,11 +253,11 @@ module RailsAiContext
         excluded = RailsAiContext.configuration.excluded_paths
         test_dirs = %w[test/ spec/ features/]
         ai_context_files = %w[CLAUDE.md AGENTS.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ .vscode/mcp.json .codex/ .mcp.json opencode.json .ai-context.json]
+        real_root = File.realpath(root).to_s
 
-        Dir.glob(File.join(search_path, glob)).each do |file|
-          relative = file.sub("#{root}/", "")
+        safe_glob(search_path, glob, real_root).each do |file|
+          relative = file.sub("#{real_root}/", "")
           next if excluded.any? { |ex| relative.start_with?(ex) }
-          next if sensitive_file?(relative)
           next if ai_context_files.any? { |p| relative.start_with?(p) || relative == p }
           next if exclude_tests && test_dirs.any? { |td| relative.start_with?(td) }
 

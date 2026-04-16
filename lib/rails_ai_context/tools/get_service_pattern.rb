@@ -32,16 +32,21 @@ module RailsAiContext
           return text_response("No app/services/ directory found. This app may not use the service objects pattern.")
         end
 
-        service_files = Dir.glob(File.join(services_dir, "**", "*.rb")).sort
+        real_root = File.realpath(root).to_s
+        real_services_dir = File.realpath(services_dir).to_s
+
+        service_files = Dir.glob(File.join(services_dir, "**", "*.rb"))
+                          .filter_map { |f| safe_glob_realpath(f, real_services_dir, real_root) }
+                          .sort
         if service_files.empty?
           return text_response("app/services/ directory exists but contains no Ruby files.")
         end
 
         if service
-          return format_single_service(service, service_files, services_dir, root)
+          return format_single_service(service, service_files, real_services_dir, real_root)
         end
 
-        format_service_listing(service_files, services_dir, root, detail)
+        format_service_listing(service_files, real_services_dir, real_root, detail)
       end
 
       private_class_method def self.format_single_service(service, service_files, services_dir, root)
@@ -275,19 +280,22 @@ module RailsAiContext
         effects.to_a.sort
       end
 
-      private_class_method def self.find_callers(class_name, root)
+      private_class_method def self.find_callers(class_name, real_root)
         callers = Set.new
-        search_dirs = %w[app/controllers app/jobs app/models app/services app/workers app/mailers].map { |d| File.join(root, d) }
+        search_dirs = %w[app/controllers app/jobs app/models app/services app/workers app/mailers].map { |d| File.join(real_root, d) }
 
         search_dirs.each do |dir|
           next unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**", "*.rb")).each do |file|
-            next if File.size(file) > max_file_size
-            source = safe_read(file)
+          real_dir = File.realpath(dir).to_s
+          Dir.glob(File.join(dir, "**", "*.rb")).each do |file_path|
+            real = safe_glob_realpath(file_path, real_dir, real_root)
+            next unless real
+            next if File.size(real) > max_file_size
+            source = safe_read(real)
             next unless source
             next unless source.include?(class_name)
 
-            relative = file.sub("#{root}/", "")
+            relative = real.sub("#{real_root}/", "")
             # Skip the service's own file
             next if relative.include?(class_name.underscore)
 

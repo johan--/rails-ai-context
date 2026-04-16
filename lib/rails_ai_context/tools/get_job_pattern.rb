@@ -27,12 +27,17 @@ module RailsAiContext
       def self.call(job: nil, detail: "standard", server_context: nil)
         root = Rails.root.to_s
         jobs_dir = File.join(root, "app", "jobs")
+        real_root = File.realpath(root).to_s
 
-        job_files = if Dir.exist?(jobs_dir)
-          files = Dir.glob(File.join(jobs_dir, "**", "*.rb")).sort
-          files.reject { |f| File.basename(f) == "application_job.rb" }
+        if Dir.exist?(jobs_dir)
+          real_jobs_dir = File.realpath(jobs_dir).to_s
+          files = Dir.glob(File.join(jobs_dir, "**", "*.rb"))
+                     .filter_map { |f| safe_glob_realpath(f, real_jobs_dir, real_root) }
+                     .sort
+          job_files = files.reject { |f| File.basename(f) == "application_job.rb" }
         else
-          []
+          real_jobs_dir = jobs_dir
+          job_files = []
         end
 
         # Pull enriched channel data from the cached introspector context — this
@@ -43,7 +48,7 @@ module RailsAiContext
         # Single-job query: requires jobs to be present.
         if job
           return text_response("No app/jobs/ directory found. This app may not use background jobs.") if job_files.empty?
-          return format_single_job(job, job_files, jobs_dir, root)
+          return format_single_job(job, job_files, real_jobs_dir, real_root)
         end
 
         # No jobs and no channels — bail out with the legacy message.
@@ -53,7 +58,7 @@ module RailsAiContext
 
         # Compose: jobs section (if any) + channels section (if any).
         lines = []
-        lines.concat(format_job_listing_lines(job_files, jobs_dir, root, detail)) if job_files.any?
+        lines.concat(format_job_listing_lines(job_files, real_jobs_dir, real_root, detail)) if job_files.any?
         if channels.any?
           lines << "" if lines.any?
           lines.concat(format_channels_section(channels))
@@ -436,21 +441,24 @@ module RailsAiContext
         lines[start_idx..end_idx].any? { |l| l.include?(class_name) }
       end
 
-      private_class_method def self.find_enqueuers(class_name, root)
+      private_class_method def self.find_enqueuers(class_name, real_root)
         enqueuers = Set.new
-        search_dirs = %w[app/controllers app/models app/services app/jobs app/workers app/mailers].map { |d| File.join(root, d) }
+        search_dirs = %w[app/controllers app/models app/services app/jobs app/workers app/mailers].map { |d| File.join(real_root, d) }
 
         search_dirs.each do |dir|
           next unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**", "*.rb")).each do |file|
-            next if File.size(file) > max_file_size
-            source = safe_read(file)
+          real_dir = File.realpath(dir).to_s
+          Dir.glob(File.join(dir, "**", "*.rb")).each do |file_path|
+            real = safe_glob_realpath(file_path, real_dir, real_root)
+            next unless real
+            next if File.size(real) > max_file_size
+            source = safe_read(real)
             next unless source
 
             # Look for ClassName.perform_later, ClassName.perform_async, ClassName.set(...).perform_later
             next unless source.match?(/#{Regexp.escape(class_name)}\.(perform_later|perform_async|set\()/)
 
-            relative = file.sub("#{root}/", "")
+            relative = real.sub("#{real_root}/", "")
             # Skip the job's own file
             own_snake = class_name.underscore
             next if relative.include?(own_snake)

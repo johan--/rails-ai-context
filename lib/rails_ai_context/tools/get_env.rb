@@ -240,13 +240,13 @@ module RailsAiContext
 
       private_class_method def self.scan_env_vars(root)
         env_vars = {}
+        real_root = File.realpath(root).to_s
         scan_dirs = %w[app config lib].map { |d| File.join(root, d) }
 
         scan_dirs.each do |dir|
           next unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**", "*.rb")).each do |file|
+          safe_glob(dir, "**/*.rb", real_root).each do |file|
             next if File.size(file) > max_file_size
-            next if sensitive_file?(file.sub("#{root}/", ""))
 
             source = safe_read(file)
             next unless source
@@ -412,12 +412,13 @@ module RailsAiContext
         app_dir = File.join(root, "app")
         return services unless Dir.exist?(app_dir)
 
-        Dir.glob(File.join(app_dir, "**", "*.rb")).each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(app_dir, "**/*.rb", real_root).each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
 
           # Faraday connections
           source.scan(/Faraday\.new\s*\(?\s*(?:url:\s*)?["']([^"']+)["']/).each do |match|
@@ -470,11 +471,12 @@ module RailsAiContext
         return [] unless prefix
 
         vars = Set.new
+        real_root = File.realpath(root).to_s
         scan_dirs = %w[app config lib].map { |d| File.join(root, d) }
 
         scan_dirs.each do |dir|
           next unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**", "*.rb")).each do |file|
+          safe_glob(dir, "**/*.rb", real_root).each do |file|
             next if File.size(file) > max_file_size
             source = safe_read(file)
             next unless source
