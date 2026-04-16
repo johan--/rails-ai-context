@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.9.0] — 2026-04-16
 
+### Fixed — Cursor chat agent didn't detect rules
+
+Real user report during release QA: the Cursor IDE's chat agent didn't pick up rules written only as `.cursor/rules/*.mdc`, even when the rule declared `alwaysApply: true`. Cursor has **two** rule systems and the chat-agent composition path still consults the legacy `.cursorrules` file in many current builds.
+
+`CursorRulesSerializer` now writes **both**: `.cursor/rules/*.mdc` (newer format with frontmatter / glob scoping / agent-requested triggers) AND a plain-text `.cursorrules` at the project root (legacy fallback, parsed verbatim by every Cursor build). Newer clients read the mdc files; older / chat-mode clients read `.cursorrules`. No behavior change for users who already relied on the mdc format.
+
+The `.cursorrules` content goes through the **same** `CompactSerializerHelper#render_compact_rules` pipeline as `CLAUDE.md`, so both files convey identical project context — header, stack overview, key models, gems, architecture, commands, rules, and the MCP tool guide. Drift between the two files is no longer possible short of a manual divergence (regression spec enforces parity).
+
+`.cursorrules` is **wrapped in `<!-- BEGIN/END rails-ai-context -->` markers** via the new `SectionMarkerWriter` module — same convention as `CLAUDE.md`, `AGENTS.md`, and `.github/copilot-instructions.md`. Pre-existing user content above or below the marker block survives every `rails ai:context` regeneration. Three regression specs cover the three branches: no-file → write markers; existing-without-markers → prepend gem block; existing-with-markers → replace only the gem block.
+
+`FORMAT_PATHS[:cursor]` in the install generator now includes `.cursorrules` so re-install cleanup covers both files when a user removes Cursor from their selection. Regression specs added in `cursor_rules_serializer_spec.rb` and `in_gemfile_install_spec.rb` (e2e) verify both files are produced and the legacy file is plain text without frontmatter.
+
+### Fixed — Round 3 follow-ups (post-quad-agent review)
+
+- **`safe_glob_realpath` rescue widened.** Previously rescued only `Errno::ENOENT` and `Errno::EACCES`. Circular symlink chains (think `node_modules/@scope/*` cycles or developer-crafted loops) raise `Errno::ELOOP`; path components exceeding `NAME_MAX` raise `Errno::ENAMETOOLONG`. Both now rescued — return `nil` to skip the entry — preserving the CLAUDE.md invariant that every introspector wraps errors.
+
+- **Install generator `CONFIG_SECTIONS` gained 3 sections.** Several user-facing config options existed in `Configuration::YAML_KEYS` but had no commented-out template line in the generated `config/initializers/rails_ai_context.rb`. Added "Database Query Tool" (`query_timeout`, `query_row_limit`, `query_redacted_columns`, `allow_query_in_production`), "Log Reading" (`log_lines`), and "Hydration" (`hydration_enabled`, `hydration_max_hints`) sections so in-Gemfile installs surface every supported knob.
+
 ### Added
 
 - **`preset` command** — composite multi-tool workflows from CLI and rake. `rails ai:preset[architecture]` runs `analyze_feature` + `dependency_graph` + `performance_check` in one call. Also: `debugging` (logs + review + validate) and `migration` (schema + migration_advisor + validate). Available via both `rails-ai-context preset architecture` and `rails 'ai:preset[architecture]'`.

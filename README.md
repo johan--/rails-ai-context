@@ -21,7 +21,7 @@
 <br>
 [![Ruby](https://img.shields.io/badge/Ruby-3.2%20%7C%203.3%20%7C%203.4-CC342D)](https://github.com/crisnahine/rails-ai-context)
 [![Rails](https://img.shields.io/badge/Rails-7.1%20%7C%207.2%20%7C%208.0-CC0000)](https://github.com/crisnahine/rails-ai-context)
-[![Tests](https://img.shields.io/badge/Tests-1989%20passing-brightgreen)](https://github.com/crisnahine/rails-ai-context/actions)
+[![Tests](https://img.shields.io/badge/Tests-2078%20passing-brightgreen)](https://github.com/crisnahine/rails-ai-context/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
@@ -376,7 +376,7 @@ Plus 9 static resources (schema, routes, conventions, gems, controllers, config,
 Every generated context file ships with **6 rules that force AI verification** before writing code. The protocol targets the exact cognitive failures that produce confident-wrong code: statistical priors overriding observed facts, pattern completion beating verification, stale context lies.
 
 <details>
-<summary><strong>The 6 rules (shown to AI in every CLAUDE.md / .cursor/rules / .github/instructions)</strong></summary>
+<summary><strong>The 6 rules (shown to AI in every CLAUDE.md / .cursor/rules / .cursorrules / .github/instructions)</strong></summary>
 
 <br>
 
@@ -403,7 +403,7 @@ graph TD
 
     B --> C["MCP Server\nstdio / HTTP\n38 tools · 5 templates"]
     B --> D["CLI Tools\nRake / Thor\nSame 38 tools"]
-    B --> E["Static Files\nCLAUDE.md · .cursor/rules/\n.github/instructions/"]
+    B --> E["Static Files\nCLAUDE.md · .cursor/rules/ · .cursorrules\n.github/instructions/"]
 
     style A fill:#4a9eff,stroke:#2d7ad4,color:#fff
     style B fill:#2d2d2d,stroke:#555,color:#fff
@@ -543,7 +543,7 @@ end
 ## About
 
 Built by a Rails developer with 10+ years of production experience.<br>
-1989 tests. 38 tools. 5 resource templates. 31 introspectors. Standalone or in-Gemfile.<br>
+2078 tests + 100-example e2e harness. 38 tools. 5 resource templates. 31 introspectors. Standalone or in-Gemfile.<br>
 MIT licensed. [Contributions welcome.](CONTRIBUTING.md)
 
 <br>

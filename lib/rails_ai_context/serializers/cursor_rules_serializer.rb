@@ -2,12 +2,22 @@
 
 module RailsAiContext
   module Serializers
-    # Generates .cursor/rules/*.mdc files in the new Cursor MDC format.
-    # Each file is focused, <50 lines, with YAML frontmatter.
-    # .cursorrules is deprecated by Cursor; this is the recommended format.
+    # Generates .cursor/rules/*.mdc files (new Cursor MDC format) AND a
+    # .cursorrules legacy fallback at the project root.
+    #
+    # Why both:
+    #   - .cursor/rules/*.mdc is the recommended format for Cursor 0.42+
+    #     with per-file scoping (alwaysApply / globs / description triggers)
+    #   - .cursorrules is still consulted by Cursor's chat agent in many
+    #     versions and is the only format older clients understand. Real
+    #     user report (v5.9.0 release QA): the chat agent didn't detect
+    #     rules written only as .cursor/rules/*.mdc; adding .cursorrules
+    #     alongside fixed it.
     class CursorRulesSerializer
+      include TestCommandDetection
       include StackOverviewHelper
       include ToolGuideHelper
+      include CompactSerializerHelper
 
       attr_reader :context
 
@@ -20,14 +30,30 @@ module RailsAiContext
       def call(output_dir)
         rules_dir = File.join(output_dir, ".cursor", "rules")
 
-        files = {
-          File.join(rules_dir, "rails-project.mdc") => render_project_rule,
-          File.join(rules_dir, "rails-models.mdc") => render_models_rule,
+        # Split rule files (.cursor/rules/*.mdc) are fully gem-owned —
+        # written as-is with no markers (the gem manages every file in
+        # that directory).
+        mdc_files = {
+          File.join(rules_dir, "rails-project.mdc")    => render_project_rule,
+          File.join(rules_dir, "rails-models.mdc")     => render_models_rule,
           File.join(rules_dir, "rails-controllers.mdc") => render_controllers_rule,
-          File.join(rules_dir, "rails-mcp-tools.mdc") => render_mcp_tools_rule
+          File.join(rules_dir, "rails-mcp-tools.mdc")  => render_mcp_tools_rule
         }
+        result = write_rule_files(mdc_files)
 
-        write_rule_files(files)
+        # .cursorrules is at the project root and may pre-date the gem
+        # install (users frequently hand-write .cursorrules before
+        # adopting any tooling). Wrap it in BEGIN/END markers like
+        # CLAUDE.md / AGENTS.md / .github/copilot-instructions.md so
+        # user content above/below the gem-managed block survives every
+        # `rails ai:context` regeneration.
+        cursorrules_path = File.join(output_dir, ".cursorrules")
+        case SectionMarkerWriter.write_with_markers(cursorrules_path, render_cursorrules_legacy)
+        when :written then result[:written] << cursorrules_path
+        when :skipped then result[:skipped] << cursorrules_path
+        end
+
+        result
       end
 
       private
@@ -168,6 +194,17 @@ module RailsAiContext
         lines.concat(render_tools_guide)
 
         lines.join("\n")
+      end
+
+      # Legacy .cursorrules fallback. Same content pipeline as CLAUDE.md
+      # (render_compact_rules from CompactSerializerHelper) — both files
+      # give an AI agent the same project context; only the filename /
+      # distribution mechanism differs. Cursor's chat agent reads
+      # .cursorrules unconditionally in every version, so this serves as
+      # the guaranteed fallback while .cursor/rules/*.mdc is the
+      # preferred-when-supported scoped format.
+      def render_cursorrules_legacy
+        render_compact_rules
       end
     end
   end

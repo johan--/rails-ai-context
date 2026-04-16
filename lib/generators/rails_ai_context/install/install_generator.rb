@@ -11,7 +11,7 @@ module RailsAiContext
 
       AI_TOOLS = {
         "1" => { key: :claude,   name: "Claude Code",     files: "CLAUDE.md + .claude/rules/",                        format: :claude },
-        "2" => { key: :cursor,   name: "Cursor",          files: ".cursor/rules/",                                     format: :cursor },
+        "2" => { key: :cursor,   name: "Cursor",          files: ".cursor/rules/ + .cursorrules (legacy fallback)",    format: :cursor },
         "3" => { key: :copilot,  name: "GitHub Copilot",  files: ".github/copilot-instructions.md + .github/instructions/", format: :copilot },
         "4" => { key: :opencode, name: "OpenCode",        files: "AGENTS.md",                                          format: :opencode },
         "5" => { key: :codex,   name: "Codex CLI",       files: "AGENTS.md + .codex/config.toml",                     format: :codex }
@@ -22,7 +22,7 @@ module RailsAiContext
       # McpConfigGenerator.remove to preserve other servers' entries.
       FORMAT_PATHS = {
         claude:   %w[CLAUDE.md .claude/rules],
-        cursor:   %w[.cursor/rules],
+        cursor:   %w[.cursor/rules .cursorrules],
         copilot:  %w[.github/copilot-instructions.md .github/instructions],
         opencode: %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md],
         codex:    %w[AGENTS.md app/models/AGENTS.md app/controllers/AGENTS.md]
@@ -258,6 +258,42 @@ module RailsAiContext
 
             # File patterns blocked from search and read tools
             # config.sensitive_patterns += %w[config/secrets.yml]
+        SECTION
+        "Database Query Tool" => <<~SECTION,
+            # ── Database Query Tool (rails_query) ─────────────────────────────
+            # Per-query statement timeout in seconds. Default: 5.
+            # config.query_timeout = 5
+
+            # Hard cap on rows returned by a single query (1..1000).
+            # Prevents accidentally pulling a million-row table into the
+            # AI's context. Default: 100.
+            # config.query_row_limit = 100
+
+            # Additional column names whose values are redacted in tool
+            # output. Defaults already cover password_digest,
+            # encrypted_password, *_token, *_secret, *_key, etc.
+            # config.query_redacted_columns += %w[my_app_specific_secret]
+
+            # rails_query is DISABLED in production by default. Setting
+            # this to true is rarely correct — only do so if you have
+            # audit logging + access controls around your AI client.
+            # config.allow_query_in_production = false
+        SECTION
+        "Log Reading" => <<~SECTION,
+            # ── Log Reading (rails_read_logs) ─────────────────────────────────
+            # Default tail length when reading a log file. Larger values
+            # surface more context but cost more AI tokens per call.
+            # config.log_lines = 50
+        SECTION
+        "Hydration" => <<~SECTION,
+            # ── Hydration ─────────────────────────────────────────────────────
+            # When enabled, MCP tool responses include schema hints telling
+            # the AI which related tools to call next. Helps agents
+            # traverse the introspection graph efficiently. Default: true.
+            # config.hydration_enabled = true
+
+            # Maximum number of hydration hints embedded per tool response.
+            # config.hydration_max_hints = 5
         SECTION
         "Search" => <<~SECTION,
             # ── Search ────────────────────────────────────────────────────────
