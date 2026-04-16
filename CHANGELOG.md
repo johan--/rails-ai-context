@@ -27,11 +27,17 @@ Real `rails new` → install → exercise → teardown against a fresh Rails app
 
 - **`spec/e2e/mcp_stdio_protocol_spec.rb`** — spawns `rails-ai-context serve` as a subprocess and walks the full JSON-RPC 2.0 handshake: `initialize` → `notifications/initialized` → `tools/list` → `tools/call`. Verifies every registered built-in tool is advertised in `tools/list` with a rails_-prefixed name, description, and inputSchema.
 
-- **`spec/e2e/mcp_http_protocol_spec.rb`** — spawns `rails-ai-context serve --transport http` on a random free port and sends `Net::HTTP` POST requests with JSON-RPC payloads. Verifies the HTTP transport returns the same tool registry and tool-call responses as stdio.
+- **`spec/e2e/mcp_http_protocol_spec.rb`** — spawns `rails-ai-context serve --transport http` on a random free port and sends `Net::HTTP` POST requests with JSON-RPC payloads. Verifies the HTTP transport returns the same tool registry and tool-call responses as stdio. Handles the Streamable HTTP requirements: `Accept: application/json, text/event-stream` header + `Mcp-Session-Id` round-trip from initialize.
+
+- **`spec/e2e/empty_app_spec.rb`** — every built-in tool must handle a Rails app with no scaffolds, no models, no custom routes. Catches "tool crashes when introspecting an empty greenfield app" — the moment a developer is most likely to install rails-ai-context.
+
+- **`spec/e2e/tool_edge_cases_spec.rb`** — malformed CLI inputs: unknown tool name, unknown parameter, missing required parameter, oversized string (10 KB), invalid enum value, fuzzy-match recovery, nonexistent target. Each case must produce structured user-facing errors, never an unhandled exception or signal.
+
+- **`spec/e2e/concurrent_mcp_spec.rb`** — two parallel `rails-ai-context serve` subprocesses against the same Rails app. Verifies independent initialize responses, identical tool registries, and that simultaneous `tools/call` invocations don't cross-talk (response id matches request id per client).
 
 Rake tasks: `bundle exec rake e2e` (full), `rake e2e:in_gemfile`, `rake e2e:standalone`, `rake e2e:zero_config`, `rake e2e:mcp`.
 
-CI: `.github/workflows/e2e.yml` runs on push to main + workflow_dispatch (separate from `ci.yml` so the 30-min job doesn't fail-stop the per-commit matrix).
+CI: `.github/workflows/e2e.yml` runs on push to main + workflow_dispatch (separate from `ci.yml` so the 30-min job doesn't fail-stop the per-commit matrix). Matrix covers Ruby 3.3 + 3.4 across Rails 7.1, 7.2, 8.0, 8.1.
 
 ### Fixed — Security Hardening (Round 3)
 
