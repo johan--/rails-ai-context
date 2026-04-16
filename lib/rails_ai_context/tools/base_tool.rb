@@ -354,6 +354,46 @@ module RailsAiContext
               File.fnmatch(pattern, basename, flags)
           end
         end
+
+        # Resolve a Dir.glob result to a realpath that is:
+        #   (a) separator-aware contained under `real_dir` (blocks sibling bypass)
+        #   (b) not a sensitive file via symlink indirection
+        # `real_dir` and `real_root` must already be realpath-resolved.
+        # Returns the realpath string (use for File.size / safe_read) or nil if rejected.
+        # Per CLAUDE.md Security Conventions — callers should perform all subsequent
+        # file operations on the returned realpath, not the original glob path.
+        def safe_glob_realpath(file_path, real_dir, real_root)
+          real = File.realpath(file_path).to_s
+          return nil unless real == real_dir || real.start_with?(real_dir + File::SEPARATOR)
+          relative = real.sub("#{real_root}/", "")
+          return nil if sensitive_file?(relative)
+          real
+        rescue Errno::ENOENT, Errno::EACCES
+          nil
+        end
+
+        # Run Dir.glob under `dir` with the given glob pattern and return an array
+        # of realpaths filtered through `safe_glob_realpath`. Skips files that
+        # escape containment (via symlink to a sibling directory) or resolve to
+        # a sensitive file. `dir` does NOT need to be realpath-resolved — this
+        # helper resolves it. Returns [] if `dir` does not exist.
+        #
+        # Usage:
+        #   safe_glob(app_dir, "**/*.rb", real_root).each do |realpath|
+        #     next if File.size(realpath) > max_file_size
+        #     source = safe_read(realpath)
+        #     ...
+        #   end
+        def safe_glob(dir, pattern, real_root)
+          return [] unless Dir.exist?(dir)
+          real_dir = File.realpath(dir).to_s
+          Dir.glob(File.join(dir, pattern)).filter_map do |file_path|
+            safe_glob_realpath(file_path, real_dir, real_root)
+          end
+        rescue Errno::ENOENT, Errno::EACCES => e
+          $stderr.puts "[rails-ai-context] safe_glob failed: #{e.message}" if ENV["DEBUG"]
+          []
+        end
       end
     end
   end

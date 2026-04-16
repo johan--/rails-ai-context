@@ -66,10 +66,11 @@ module RailsAiContext
         # Scan existing tests to learn project patterns
         def detect_patterns(framework) # rubocop:disable Metrics
           root = Rails.root.to_s
+          real_root = File.realpath(root).to_s
           patterns = { factory_style: :create, let_style: true, expect_style: true, described_class: true }
 
-          glob = framework == "rspec" ? "spec/**/*_spec.rb" : "test/**/*_test.rb"
-          files = Dir.glob(File.join(root, glob)).first(5)
+          dir, glob = framework == "rspec" ? [ "spec", "**/*_spec.rb" ] : [ "test", "**/*_test.rb" ]
+          files = safe_glob(File.join(root, dir), glob, real_root).first(5)
 
           expect_count = 0
           should_count = 0

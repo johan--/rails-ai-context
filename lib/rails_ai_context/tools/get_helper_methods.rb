@@ -56,7 +56,11 @@ module RailsAiContext
           return text_response("No app/helpers/ directory found.")
         end
 
-        helper_files = Dir.glob(File.join(helpers_dir, "**", "*.rb")).sort
+        real_root = File.realpath(root).to_s
+        real_helpers_dir = File.realpath(helpers_dir).to_s
+        helper_files = Dir.glob(File.join(helpers_dir, "**", "*.rb"))
+                         .filter_map { |f| safe_glob_realpath(f, real_helpers_dir, real_root) }
+                         .sort
 
         if helper_files.empty?
           return text_response("No helper files found in app/helpers/.")
@@ -64,11 +68,11 @@ module RailsAiContext
 
         # Specific helper — full detail
         if helper
-          return show_helper(helper, helper_files, helpers_dir, root, max_size, detail)
+          return show_helper(helper, helper_files, real_helpers_dir, real_root, max_size, detail)
         end
 
         # List all helpers
-        list_helpers(helper_files, helpers_dir, root, max_size, detail, offset: offset, limit: limit)
+        list_helpers(helper_files, real_helpers_dir, real_root, max_size, detail, offset: offset, limit: limit)
       end
 
       private_class_method def self.show_helper(name, helper_files, helpers_dir, root, max_size, detail)
@@ -238,14 +242,16 @@ module RailsAiContext
         []
       end
 
-      private_class_method def self.find_view_references(method_names, root)
-        views_dir = File.join(root, "app", "views")
+      private_class_method def self.find_view_references(method_names, real_root)
+        views_dir = File.join(real_root, "app", "views")
         return {} unless Dir.exist?(views_dir)
 
+        real_views_dir = File.realpath(views_dir).to_s
         references = {}
         max_size = RailsAiContext.configuration.max_file_size
 
         view_files = Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}"))
+                        .filter_map { |f| safe_glob_realpath(f, real_views_dir, real_root) }
 
         method_names.each do |method_name|
           matching_views = []
@@ -255,7 +261,7 @@ module RailsAiContext
             content = RailsAiContext::SafeFile.read(view_path) or next
 
             if content.include?(method_name)
-              relative = view_path.sub("#{root}/app/views/", "")
+              relative = view_path.sub("#{real_views_dir}/", "")
               matching_views << relative
             end
           end
@@ -269,26 +275,29 @@ module RailsAiContext
         {}
       end
 
-      private_class_method def self.detect_framework_helpers(root, max_size)
+      private_class_method def self.detect_framework_helpers(real_root, max_size)
         detected = {}
 
         # Check Gemfile for framework gems
-        gemfile_path = File.join(root, "Gemfile")
+        gemfile_path = File.join(real_root, "Gemfile")
         return detected unless File.exist?(gemfile_path)
 
         gemfile = RailsAiContext::SafeFile.read(gemfile_path) || ""
 
         # Collect all view file content for scanning
-        views_dir = File.join(root, "app", "views")
-        helpers_dir = File.join(root, "app", "helpers")
+        views_dir = File.join(real_root, "app", "views")
+        helpers_dir = File.join(real_root, "app", "helpers")
         scan_content = ""
 
         [ views_dir, helpers_dir ].each do |dir|
           next unless Dir.exist?(dir)
+          real_dir = File.realpath(dir).to_s
           extensions = dir == views_dir ? "*.{erb,haml,slim}" : "*.rb"
           Dir.glob(File.join(dir, "**", extensions)).each do |path|
-            next if File.size(path) > max_size
-            scan_content += (RailsAiContext::SafeFile.read(path) || "")
+            real = safe_glob_realpath(path, real_dir, real_root)
+            next unless real
+            next if File.size(real) > max_size
+            scan_content += (RailsAiContext::SafeFile.read(real) || "")
           end
         end
 

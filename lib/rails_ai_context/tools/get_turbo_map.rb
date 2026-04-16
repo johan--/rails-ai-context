@@ -339,12 +339,13 @@ module RailsAiContext
         models_dir = File.join(root, "app", "models")
         return results unless Dir.exist?(models_dir)
 
-        Dir.glob(File.join(models_dir, "**", "*.rb")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(models_dir, "**/*.rb", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
           model_name = extract_class_name(source) || File.basename(file, ".rb").camelize
 
           source.each_line.with_index(1) do |line, line_num|
@@ -371,17 +372,18 @@ module RailsAiContext
       # Handles multi-line calls by joining the method line with subsequent lines
       private_class_method def self.scan_rb_broadcasts(root)
         results = []
+        real_root = File.realpath(root).to_s
         search_dirs = %w[app/controllers app/models app/services app/jobs app/workers app/channels].map { |d| File.join(root, d) }
 
         search_dirs.each do |dir|
           next unless Dir.exist?(dir)
 
-          Dir.glob(File.join(dir, "**", "*.rb")).sort.each do |file|
+          safe_glob(dir, "**/*.rb", real_root).sort.each do |file|
             next if File.size(file) > max_file_size
             source = safe_read(file)
             next unless source
 
-            relative = file.sub("#{root}/", "")
+            relative = file.sub("#{real_root}/", "")
             lines = source.lines
 
             lines.each_with_index do |line, idx|
@@ -419,12 +421,13 @@ module RailsAiContext
         views_dir = File.join(root, "app", "views")
         return results unless Dir.exist?(views_dir)
 
-        Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(views_dir, "**/*.{erb,haml,slim}", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
 
           source.each_line.with_index(1) do |line, line_num|
             next unless line.include?("turbo_stream_from")
@@ -448,12 +451,13 @@ module RailsAiContext
         views_dir = File.join(root, "app", "views")
         return results unless Dir.exist?(views_dir)
 
-        Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).sort.each do |file|
+        real_root = File.realpath(root).to_s
+        safe_glob(views_dir, "**/*.{erb,haml,slim}", real_root).sort.each do |file|
           next if File.size(file) > max_file_size
           source = safe_read(file)
           next unless source
 
-          relative = file.sub("#{root}/", "")
+          relative = file.sub("#{real_root}/", "")
 
           source.each_line.with_index(1) do |line, line_num|
             next unless line.include?("turbo_frame_tag")

@@ -15,6 +15,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Validation pre-commit hook** — optional during `rails generate rails_ai_context:install`. Prompts to install a `.git/hooks/pre-commit` hook that runs `rails ai:tool[validate]` on staged `.rb` and `.erb` files. Catches hallucinated columns and schema drift before commit. Respects existing hooks and `--no-verify`.
 
+### Fixed — Security Hardening (Round 3)
+
+Pre-release audit of **every** `Dir.glob` call site across the 38 tools. The 5-rule file-read pattern documented in CLAUDE.md was enforced on caller-supplied paths, but glob-sourced paths were reading file content without the same hardening. A symlink pre-planted inside `app/services/`, `app/jobs/`, `app/helpers/`, `app/models/`, `app/controllers/`, `app/views/`, or `app/` (pointing at `config/master.key`) would have leaked secret contents through tool output.
+
+- **`BaseTool.safe_glob_realpath` + `BaseTool.safe_glob`** added as shared helpers. Every glob-sourced file read now passes through this filter: realpath + separator-aware containment + `sensitive_file?` recheck on the realpath. Broken symlinks, sibling-directory bypasses, and sensitive-pattern matches return `nil` and are skipped.
+
+- **`get_service_pattern`, `get_job_pattern`, `get_helper_methods`** — glob+read on `app/services/`, `app/jobs/`, `app/helpers/` plus nested `find_callers` / `find_enqueuers` / `find_view_references` / `detect_framework_helpers`. All hardened.
+
+- **`analyze_feature`** — 10 glob sites across `discover_services`, `discover_jobs`, `discover_views`, `discover_tests`, `discover_test_gaps`, `discover_channels`, `discover_mailers`, `discover_env_dependencies`. All hardened.
+
+- **`get_conventions`** — glob+read on controllers (convention detection), services (listing), locales, controllers (UI-language detection), tests (pattern detection). All hardened.
+
+- **`get_turbo_map`** — glob+read on models, controllers/services/jobs/channels, and two view scans. All hardened.
+
+- **`get_env`** — glob+read on `app/config/lib` for ENV scans, `app/` for HTTP-client detection, and `app/config/lib` for prefix-matched ENV vars. All hardened. Removed redundant pre-realpath `sensitive_file?` now that `safe_glob` checks post-realpath.
+
+- **`get_test_info`** — glob+read on `test/**/*_test.rb` for Devise detection, `test/fixtures` and `spec/fixtures` for fixture parsing. Hardened.
+
+- **`generate_test`** — glob+read on `spec/**/*_spec.rb` or `test/**/*_test.rb` for pattern detection. Hardened.
+
+- **`get_stimulus`** — glob+read on `app/views/**/*.{erb,html.erb}` for `data-controller` usage. Hardened.
+
+- **`onboard`** — glob of `app/services/` for service name extraction (basename only). Hardened for consistency even though no content is read.
+
+- **`search_code`** (ruby-fallback path) — the pre-realpath `sensitive_file?` check did not catch a symlink `app/models/innocent.rb → config/master.key` because the relative path looked safe. Now goes through `safe_glob` which rechecks on the realpath.
+
+- **`job_introspector.rb:205`** — bare `rescue` (catching `Exception`, including `Interrupt`/`SystemExit`) replaced with project-standard `rescue => e` + DEBUG logging guard.
+
+- **14 new regression specs** covering every newly-hardened tool with a symlink-to-master.key PoC + 5 edge cases for the `safe_glob_realpath` helper (sibling bypass, broken symlinks, sensitive realpath, separator awareness, in-tree passthrough).
+
 ### Fixed — Security Hardening (Round 2)
 
 Eleven additional vulnerabilities and defense-in-depth gaps found by multi-round adversarial code review. All discovered post-v5.8.1 — **users on 5.8.x should upgrade**.

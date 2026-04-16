@@ -282,9 +282,10 @@ module RailsAiContext
           # Detect Devise + sign_in pattern from existing tests
           has_devise = false
           has_sign_in = false
-          test_dir = Rails.root.join("test")
+          test_dir = Rails.root.join("test").to_s
           if Dir.exist?(test_dir)
-            Dir.glob(File.join(test_dir, "**/*_test.rb")).first(5).each do |path|
+            real_root = File.realpath(Rails.root).to_s
+            safe_glob(test_dir, "**/*_test.rb", real_root).first(5).each do |path|
               content = RailsAiContext::SafeFile.read(path) or next
               has_devise = true if content.include?("Devise::Test")
               has_sign_in = true if content.include?("sign_in")
@@ -413,14 +414,15 @@ module RailsAiContext
       # Parse all fixture files, returning { "fixture_file" => { entry => attrs } }
       private_class_method def self.parse_all_fixture_contents
         fixture_dirs = [
-          Rails.root.join("test", "fixtures"),
-          Rails.root.join("spec", "fixtures")
+          Rails.root.join("test", "fixtures").to_s,
+          Rails.root.join("spec", "fixtures").to_s
         ]
+        real_root = File.realpath(Rails.root).to_s
 
         results = {}
         fixture_dirs.each do |dir|
           next unless Dir.exist?(dir)
-          Dir.glob(File.join(dir, "**", "*.yml")).sort.each do |path|
+          safe_glob(dir, "**/*.yml", real_root).sort.each do |path|
             rel_name = File.basename(path, ".yml")
             entries = parse_fixture_contents(path)
             results[rel_name] = entries if entries.any?

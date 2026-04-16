@@ -224,17 +224,20 @@ module RailsAiContext
       end
 
       private_class_method def self.find_views_using(controller_name)
-        views_dir = Rails.root.join("app", "views")
+        views_dir = Rails.root.join("app", "views").to_s
         return [] unless Dir.exist?(views_dir)
+
+        real_root = File.realpath(Rails.root).to_s
+        real_views_dir = File.realpath(views_dir).to_s
 
         pattern = "data-controller=\"#{controller_name}\""
         # Also check for multi-controller declarations
         alt_pattern = controller_name
 
-        Dir.glob(File.join(views_dir, "**", "*.{erb,html.erb}")).filter_map do |path|
+        safe_glob(views_dir, "**/*.{erb,html.erb}", real_root).filter_map do |path|
           content = RailsAiContext::SafeFile.read(path) or next
           next unless content.include?(alt_pattern)
-          path.sub("#{Rails.root}/app/views/", "")
+          path.sub("#{real_views_dir}/", "")
         end.first(10)
       rescue => e
         $stderr.puts "[rails-ai-context] find_views_using failed: #{e.message}" if ENV["DEBUG"]

@@ -634,7 +634,8 @@ module RailsAiContext
           services_dir = File.join(Rails.root, "app", "services")
           return [] unless Dir.exist?(services_dir)
 
-          Dir.glob(File.join(services_dir, "**", "*.rb")).filter_map do |path|
+          real_root = File.realpath(Rails.root).to_s
+          safe_glob(services_dir, "**/*.rb", real_root).filter_map do |path|
             name = File.basename(path, ".rb").camelize
             name unless name == "ApplicationService" || name == "BaseService"
           end

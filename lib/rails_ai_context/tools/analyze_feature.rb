@@ -200,7 +200,8 @@ module RailsAiContext
           dir = File.join(root, "app", "services")
           return unless Dir.exist?(dir)
 
-          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          real_root = File.realpath(root).to_s
+          candidates = safe_glob(dir, "**/*.rb", real_root).first(MAX_SCAN_FILES)
           # Prefer basename match (fast, no file read) and only fall back to
           # a content scan for files whose basename doesn't match. This
           # avoids reading every service file's full contents on large apps.
@@ -212,7 +213,7 @@ module RailsAiContext
 
           lines << "## Services (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
-            relative = path.sub("#{root}/", "")
+            relative = path.sub("#{real_root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
             line_count = source.lines.size
             methods = source.scan(/^\s*def (?:self\.)?(\w+)/m).flatten.reject { |m| m == "initialize" }
@@ -230,7 +231,8 @@ module RailsAiContext
           dir = File.join(root, "app", "jobs")
           return unless Dir.exist?(dir)
 
-          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          real_root = File.realpath(root).to_s
+          candidates = safe_glob(dir, "**/*.rb", real_root).first(MAX_SCAN_FILES)
           found = candidates.select do |path|
             File.basename(path, ".rb").include?(pattern)
           end
@@ -238,7 +240,7 @@ module RailsAiContext
 
           lines << "## Jobs (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
-            relative = path.sub("#{root}/", "")
+            relative = path.sub("#{real_root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
             queue = source.match(/queue_as\s+[:'"](\w+)/)&.captures&.first || "default"
             retries = source.match(/retry_on.*attempts:\s*(\d+)/)&.captures&.first
@@ -255,15 +257,17 @@ module RailsAiContext
           views_dir = File.join(root, "app", "views")
           return unless Dir.exist?(views_dir)
 
-          candidates = Dir.glob(File.join(views_dir, "**", "*.{erb,haml,slim}")).first(MAX_SCAN_FILES)
+          real_root = File.realpath(root).to_s
+          real_views_dir = File.realpath(views_dir).to_s
+          candidates = safe_glob(views_dir, "**/*.{erb,haml,slim}", real_root).first(MAX_SCAN_FILES)
           found = candidates.select do |path|
-            path.sub("#{views_dir}/", "").downcase.include?(pattern)
+            path.sub("#{real_views_dir}/", "").downcase.include?(pattern)
           end
           return if found.empty?
 
           lines << "## Views (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
-            relative = path.sub("#{views_dir}/", "")
+            relative = path.sub("#{real_views_dir}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
             line_count = source.lines.size
             partials = source.scan(/render\s+(?:partial:\s*)?["']([^"']+)["']/).flatten
@@ -314,17 +318,18 @@ module RailsAiContext
         # --- AF5: Tests ---
         def discover_tests(root, pattern, lines)
           test_dirs = [ File.join(root, "spec"), File.join(root, "test") ]
+          real_root = File.realpath(root).to_s
           found = []
           truncated = false
 
           test_dirs.each do |dir|
             next unless Dir.exist?(dir)
-            suffix_glob = Dir.glob(File.join(dir, "**", "*_{test,spec}.rb")).first(MAX_SCAN_FILES)
+            suffix_glob = safe_glob(dir, "**/*_{test,spec}.rb", real_root).first(MAX_SCAN_FILES)
             truncated = true if suffix_glob.size == MAX_SCAN_FILES
             suffix_glob.each do |path|
               found << path if File.basename(path, ".rb").include?(pattern)
             end
-            prefix_glob = Dir.glob(File.join(dir, "**", "{test,spec}_*.rb")).first(MAX_SCAN_FILES)
+            prefix_glob = safe_glob(dir, "**/{test,spec}_*.rb", real_root).first(MAX_SCAN_FILES)
             truncated = true if prefix_glob.size == MAX_SCAN_FILES
             prefix_glob.each do |path|
               found << path if File.basename(path, ".rb").include?(pattern)
@@ -336,7 +341,7 @@ module RailsAiContext
           header = "## Tests (#{found.size}#{truncated ? " — first #{MAX_SCAN_FILES} per glob scanned" : ""})"
           lines << header
           found.each do |path|
-            relative = path.sub("#{root}/", "")
+            relative = path.sub("#{real_root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
             test_count = source.scan(/\b(?:it|test|should)\b/).size
             lines << "- `#{relative}` (#{test_count} tests)"
@@ -371,10 +376,12 @@ module RailsAiContext
             end
           end
 
+          real_root = File.realpath(root).to_s
+
           # Check jobs
           job_dir = File.join(root, "app", "jobs")
           if Dir.exist?(job_dir)
-            Dir.glob(File.join(job_dir, "**", "*.rb")).first(MAX_SCAN_FILES).each do |path|
+            safe_glob(job_dir, "**/*.rb", real_root).first(MAX_SCAN_FILES).each do |path|
               next unless File.basename(path, ".rb").include?(pattern)
               snake = File.basename(path, ".rb")
               unless test_basenames.any? { |t| t.include?(snake) }
@@ -386,7 +393,7 @@ module RailsAiContext
           # Check services
           service_dir = File.join(root, "app", "services")
           if Dir.exist?(service_dir)
-            Dir.glob(File.join(service_dir, "**", "*.rb")).first(MAX_SCAN_FILES).each do |path|
+            safe_glob(service_dir, "**/*.rb", real_root).first(MAX_SCAN_FILES).each do |path|
               next unless File.basename(path, ".rb").include?(pattern)
               snake = File.basename(path, ".rb")
               unless test_basenames.any? { |t| t.include?(snake) }
@@ -498,13 +505,14 @@ module RailsAiContext
           dir = File.join(root, "app", "channels")
           return unless Dir.exist?(dir)
 
-          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          real_root = File.realpath(root).to_s
+          candidates = safe_glob(dir, "**/*.rb", real_root).first(MAX_SCAN_FILES)
           found = candidates.select { |p| File.basename(p, ".rb").include?(pattern) }
           return if found.empty?
 
           lines << "## Channels (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
-            relative = path.sub("#{root}/", "")
+            relative = path.sub("#{real_root}/", "")
             lines << "- `#{relative}`"
           end
           lines << ""
@@ -518,13 +526,14 @@ module RailsAiContext
           dir = File.join(root, "app", "mailers")
           return unless Dir.exist?(dir)
 
-          candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+          real_root = File.realpath(root).to_s
+          candidates = safe_glob(dir, "**/*.rb", real_root).first(MAX_SCAN_FILES)
           found = candidates.select { |p| File.basename(p, ".rb").include?(pattern) }
           return if found.empty?
 
           lines << "## Mailers (#{found.size}#{candidates.size == MAX_SCAN_FILES ? " — first #{MAX_SCAN_FILES} scanned" : ""})"
           found.each do |path|
-            relative = path.sub("#{root}/", "")
+            relative = path.sub("#{real_root}/", "")
             source = RailsAiContext::SafeFile.read(path) or next
             methods = source.scan(/^\s*def (\w+)/m).flatten.reject { |m| m == "initialize" }
             lines << "- `#{relative}` — #{methods.join(', ')}" if methods.any?
@@ -563,12 +572,13 @@ module RailsAiContext
         # --- AF9: Environment Dependencies ---
         def discover_env_dependencies(root, pattern, matched_models, lines)
           # Scan services, jobs, and model files for ENV references
+          real_root = File.realpath(root).to_s
           dirs = %w[app/services app/jobs].map { |d| File.join(root, d) }.select { |d| Dir.exist?(d) }
           env_vars = Set.new
           truncated = false
 
           dirs.each do |dir|
-            candidates = Dir.glob(File.join(dir, "**", "*.rb")).first(MAX_SCAN_FILES)
+            candidates = safe_glob(dir, "**/*.rb", real_root).first(MAX_SCAN_FILES)
             truncated = true if candidates.size == MAX_SCAN_FILES
             candidates.each do |path|
               next unless File.basename(path, ".rb").include?(pattern) || path.downcase.include?(pattern)
