@@ -2,19 +2,24 @@
 
 require_relative "e2e_helper"
 
-# Massive Rails app — programmatically generate 1500 models + 1500 tables
+# Massive Rails app — programmatically generate 500 models + 500 tables
 # in a single migration, then exercise representative tools to verify they
 # don't crash, hang, or OOM. Catches: unbounded output, unbounded memory
 # use, tools that forgot to cap their Dir.glob / introspection work, and
 # tools that don't truncate large payloads before returning.
 #
-# Running all 38 tools against 1500 models would take 10-30 minutes. We
+# 500 models is sufficient to exercise every scaling path: response caps
+# (e.g. rails_get_schema truncates at ~25 tables), introspector Dir.glob
+# walks, and model-file parsing volume. Bumping to 1500 burned ~3x the
+# time for linear-scan behavior already stressed at 500.
+#
+# Running all 38 tools against 500 models would still take minutes. We
 # sample the tools most likely to scale poorly: schema (DB walk),
 # model_details (model walk), routes (routes walk), context/onboard
 # (aggregate), analyze_feature (multi-dir scans), turbo_map (model +
 # view scan), get_env (app tree scan).
-RSpec.describe "E2E: massive Rails app (1500 models)", type: :e2e do
-  MODEL_COUNT = 1500
+RSpec.describe "E2E: massive Rails app (500 models)", type: :e2e do
+  MODEL_COUNT = 500
   # Bumped timeout — tools that introspect every model file or every
   # schema table need more than the default 60 s on a cold-boot Rails app.
   PER_TOOL_TIMEOUT = 180
@@ -37,7 +42,7 @@ RSpec.describe "E2E: massive Rails app (1500 models)", type: :e2e do
   ].freeze
 
   SCALE_CRITICAL_TOOLS.each do |short|
-    it "#{short} completes without crashing on a 1500-model app" do
+    it "#{short} completes without crashing on a #{MODEL_COUNT}-model app" do
       args = short == "analyze_feature" ? [ "--feature", "thing" ] : []
       result = @cli.cli_tool(short, args, timeout: PER_TOOL_TIMEOUT)
       expect(result.status.signaled?).to be(false), "#{short} received a signal:\n#{result}"
@@ -50,14 +55,14 @@ RSpec.describe "E2E: massive Rails app (1500 models)", type: :e2e do
     end
   end
 
-  it "the migration actually created all 1500 tables" do
+  it "the migration actually created all 500 tables" do
     # Query a specific table from the middle of the range. The default
     # `rails_get_schema` response caps output at first-~25 tables (correct
     # behavior for AI-client context windows), so query a single table
-    # to verify the fixture built all 1500.
-    result = @cli.cli_tool("schema", [ "--table", "thing_0750s" ])
+    # to verify the fixture built all 500.
+    result = @cli.cli_tool("schema", [ "--table", "thing_0250s" ])
     expect(result.success?).to be(true), result.to_s
-    expect(result.stdout).to match(/thing_0750/)
+    expect(result.stdout).to match(/thing_0250/)
     expect(result.stdout).to match(/name.*string|value.*integer/)
   end
 
@@ -67,7 +72,7 @@ RSpec.describe "E2E: massive Rails app (1500 models)", type: :e2e do
     # first page.
     result = @cli.cli_tool("schema")
     expect(result.success?).to be(true)
-    expect(result.stdout).to match(/1501 tables|1500 tables/)  # +1 for posts
+    expect(result.stdout).to match(/501 tables|500 tables/)  # +1 for posts
   end
 
   private

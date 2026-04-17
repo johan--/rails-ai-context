@@ -7,11 +7,8 @@ require_relative "e2e_helper"
 # never crashes, and never silently succeed with garbage output.
 RSpec.describe "E2E: tool input edge cases", type: :e2e do
   before(:all) do
-    @builder = E2E::TestAppBuilder.new(
-      parent_dir: E2E.root,
-      name: "edge_cases_app",
-      install_path: :in_gemfile
-    ).build!
+    # Read-only spec — reuse the shared in-Gemfile fixture.
+    @builder = E2E.shared_app(install_path: :in_gemfile)
     @cli = E2E::CliRunner.new(@builder)
   end
 

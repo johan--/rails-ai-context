@@ -8,9 +8,13 @@ module E2E
   #   :standalone  — build gem, install to isolated GEM_HOME, run `rails-ai-context init`
   #   :zero_config — same GEM_HOME setup, but no init/generator — just serve with defaults
   class TestAppBuilder
+    # Bootsnap stays enabled (no --skip-bootsnap) because the harness runs
+    # many bin/rails / rails-ai-context invocations against each generated
+    # app. First boot pays the compile cost; subsequent boots reuse the
+    # cache at tmp/cache/bootsnap, cutting ~2-3s off each follow-on call.
     BASE_RAILS_NEW_FLAGS = %w[
       --skip-bundle --skip-git --skip-spring --skip-listen
-      --skip-javascript --skip-test --skip-system-test --skip-bootsnap
+      --skip-javascript --skip-test --skip-system-test
       --skip-dev-gems --skip-rubocop --skip-ci --skip-kamal --skip-solid
       --skip-thruster --skip-docker
     ].freeze
@@ -95,6 +99,35 @@ module E2E
       install_path == :standalone || install_path == :zero_config
     end
 
+    # Build the gem artefact once per rspec process and memoize the path.
+    # Standalone + zero_config paths each do a per-spec `gem install` but
+    # reuse the same pre-built .gem — avoids spending ~2s on `gem build`
+    # every time we spin up one of those specs.
+    #
+    # Thread-safety: rspec runs specs serially by default, so a plain @@
+    # memo is fine. parallel_tests forks workers before specs load, so
+    # each worker would rebuild once — still net positive.
+    @shared_gem_mutex = Mutex.new
+    def self.shared_gem_artifact_path
+      @shared_gem_mutex.synchronize do
+        return @shared_gem_artifact_path if @shared_gem_artifact_path && File.exist?(@shared_gem_artifact_path)
+
+        unbundled = {
+          "BUNDLE_GEMFILE" => nil, "BUNDLE_BIN_PATH" => nil, "BUNDLE_PATH" => nil,
+          "BUNDLER_SETUP" => nil, "BUNDLER_VERSION" => nil,
+          "RUBYOPT" => nil, "RUBYLIB" => nil
+        }
+        build_out, status = Open3.capture2e(unbundled, "gem", "build", "rails-ai-context.gemspec", chdir: GEM_ROOT)
+        raise "gem build failed:\n#{build_out}" unless status.success?
+
+        gemfile_name = build_out[/File:\s*(\S+)/, 1] || Dir.glob(File.join(GEM_ROOT, "rails-ai-context-*.gem")).max_by { |f| File.mtime(f) }
+        gem_path = File.absolute_path(gemfile_name, GEM_ROOT)
+        raise "could not find built .gem artefact (looked for #{gem_path})" unless File.exist?(gem_path)
+
+        @shared_gem_artifact_path = gem_path
+      end
+    end
+
     private
 
     def run_rails_new!
@@ -175,8 +208,9 @@ module E2E
       "a\n1\nn\n"
     end
 
-    # Build the .gem artefact and install it into an isolated GEM_HOME
-    # so standalone / zero_config paths never touch the system gem set.
+    # Build the .gem artefact ONCE per rspec process (memoized on the
+    # class) and install into an isolated GEM_HOME for standalone /
+    # zero_config paths so they never touch the system gem set.
     #
     # Must run with a *clean* env — the outer RSpec process runs under
     # Bundler, so Bundler env vars (BUNDLE_GEMFILE, BUNDLER_SETUP, RUBYOPT,
@@ -185,13 +219,7 @@ module E2E
     # (producing a `Bundler::GemNotFound` on every dev-dependency).
     def build_and_install_gem!
       FileUtils.mkdir_p(gem_home)
-
-      build_out, status = Open3.capture2e(unbundled_env, "gem", "build", "rails-ai-context.gemspec", chdir: GEM_ROOT)
-      raise "gem build failed:\n#{build_out}" unless status.success?
-
-      gemfile_name = build_out[/File:\s*(\S+)/, 1] || Dir.glob(File.join(GEM_ROOT, "rails-ai-context-*.gem")).max_by { |f| File.mtime(f) }
-      gem_path = File.absolute_path(gemfile_name, GEM_ROOT)
-      raise "could not find built .gem artefact (looked for #{gem_path})" unless File.exist?(gem_path)
+      gem_path = self.class.shared_gem_artifact_path
 
       install_env = unbundled_env.merge(
         "GEM_HOME" => gem_home,

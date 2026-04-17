@@ -11,11 +11,8 @@ require_relative "e2e_helper"
 # than spawning one stdio server per consumer.
 RSpec.describe "E2E: MCP HTTP protocol", type: :e2e do
   before(:all) do
-    @builder = E2E::TestAppBuilder.new(
-      parent_dir: E2E.root,
-      name: "mcp_http_app",
-      install_path: :in_gemfile
-    ).build!
+    # Read-only spec — reuse the shared in-Gemfile fixture.
+    @builder = E2E.shared_app(install_path: :in_gemfile)
     @http = E2E::HttpServerHarness.new(@builder).start!
   end
 

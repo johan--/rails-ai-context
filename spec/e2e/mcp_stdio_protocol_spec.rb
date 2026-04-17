@@ -11,11 +11,8 @@ require_relative "e2e_helper"
 # the stdio transport behavior is identical across install paths.
 RSpec.describe "E2E: MCP stdio protocol", type: :e2e do
   before(:all) do
-    @builder = E2E::TestAppBuilder.new(
-      parent_dir: E2E.root,
-      name: "mcp_stdio_app",
-      install_path: :in_gemfile
-    ).build!
+    # Read-only spec — reuse the shared in-Gemfile fixture.
+    @builder = E2E.shared_app(install_path: :in_gemfile)
     @mcp = E2E::McpStdioClient.new(@builder).start!
   end
 

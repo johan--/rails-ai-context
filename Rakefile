@@ -43,4 +43,32 @@ RSpec::Core::RakeTask.new(:e2e) do |t|
   ENV["E2E"] = "1"
 end
 
+namespace :e2e do
+  desc "Run e2e specs in parallel via parallel_tests (opt-in; uses all CPUs)"
+  task :parallel do
+    # Opt-in parallelization. Each parallel_tests worker is a separate
+    # process — it will rebuild its own shared-fixture memoization and
+    # its own built .gem artefact. Still a net win because rspec-level
+    # wall-clock scales with the slowest worker, not the sum.
+    #
+    # Caveats:
+    #   - postgres_install_spec is excluded here because its DB name is
+    #     derived from E2E_DB_SUFFIX and workers would collide unless you
+    #     pre-create per-worker databases. Run `rake e2e` separately if
+    #     you need postgres coverage.
+    #   - Shared BUNDLE_PATH is NOT used in parallel mode — two workers
+    #     writing to the same bundle path can corrupt native extension
+    #     builds. Each worker gets its own implicit bundle directory.
+    require "shellwords"
+    spec_files = Dir["spec/e2e/**/*_spec.rb"].reject { |p| p.include?("postgres_install_spec") }
+    cmd = [
+      "bundle", "exec", "parallel_rspec",
+      "--serialize-stdout",
+      "--"
+    ] + spec_files
+    env = { "E2E" => "1", "BUNDLE_PATH" => nil }
+    sh(env, *cmd) { |ok, _res| abort("parallel_rspec failed") unless ok }
+  end
+end
+
 task default: :spec

@@ -15,11 +15,8 @@ require_relative "e2e_helper"
 # fourth client would hit.
 RSpec.describe "E2E: concurrent MCP stdio clients", type: :e2e do
   before(:all) do
-    @builder = E2E::TestAppBuilder.new(
-      parent_dir: E2E.root,
-      name: "concurrent_mcp_app",
-      install_path: :in_gemfile
-    ).build!
+    # Read-only spec — reuse the shared in-Gemfile fixture.
+    @builder = E2E.shared_app(install_path: :in_gemfile)
   end
 
   it "two parallel clients each receive their own initialize response" do

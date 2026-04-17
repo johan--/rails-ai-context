@@ -60,6 +60,13 @@ jobs:
     env:
       E2E: "1"
       RAILS_VERSION: ${{ matrix.rails }}
+      # Share one bundler install directory across every e2e app spawned
+      # in this matrix cell. TestAppBuilder#env inherits this env var, so
+      # each `bundle install` inside a generated Rails app resolves gems
+      # into the shared path — first app compiles native extensions (pg,
+      # sqlite3, nokogiri), subsequent apps find them already installed.
+      # Cached across workflow runs keyed on Rails version.
+      BUNDLE_PATH: ${{ github.workspace }}/.e2e-bundle
       # Postgres connection params consumed by spec/e2e/postgres_install_spec.rb
       # via the rewritten config/database.yml in TestAppBuilder.
       TEST_POSTGRES: "1"
@@ -76,6 +83,14 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
+
+      - name: Cache shared e2e bundle directory
+        uses: actions/cache@v4
+        with:
+          path: .e2e-bundle
+          key: e2e-bundle-ruby${{ matrix.ruby }}-rails${{ matrix.rails }}-v1
+          restore-keys: |
+            e2e-bundle-ruby${{ matrix.ruby }}-rails${{ matrix.rails }}-
 
       - name: Install Rails globally (for `rails new`)
         env:

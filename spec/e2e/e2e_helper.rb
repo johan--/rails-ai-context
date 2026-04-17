@@ -16,6 +16,7 @@ require_relative "support/test_app_builder"
 require_relative "support/cli_runner"
 require_relative "support/mcp_stdio_client"
 require_relative "support/http_server_harness"
+require_relative "support/shared_apps"
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
