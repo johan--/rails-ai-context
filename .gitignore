@@ -20,3 +20,5 @@ CLAUDE.md
 
 # Integration test apps
 test_apps/
+
+.chunkhound/
